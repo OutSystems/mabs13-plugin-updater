@@ -5,16 +5,29 @@ import Foundation
 /// Represents a CocoaPods dependency from plugin.xml
 public struct PodDependency: Equatable, Codable {
     public let name: String
-    public let spec: String
+    /// CocoaPods version spec (e.g. "~> 4.0"). Nil when the pod is defined with git/tag attributes.
+    public let spec: String?
+    /// Direct git URL (from `git` attribute on the `<pod>` element)
+    public let git: String?
+    /// Git tag (from `tag` attribute on the `<pod>` element)
+    public let tag: String?
+    /// Git branch (from `branch` attribute on the `<pod>` element)
+    public let branch: String?
 
-    public init(name: String, spec: String) {
+    public init(name: String, spec: String? = nil, git: String? = nil, tag: String? = nil, branch: String? = nil) {
         self.name = name
         self.spec = spec
+        self.git = git
+        self.tag = tag
+        self.branch = branch
     }
 
     /// Human-readable description
     public var description: String {
-        "\(name) (\(spec))"
+        if let git {
+            return "\(name) (git: \(git)\(tag.map { ", tag: \($0)" } ?? ""))"
+        }
+        return "\(name) (\(spec ?? ""))"
     }
 }
 

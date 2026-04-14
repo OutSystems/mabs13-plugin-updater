@@ -91,8 +91,20 @@ public class DependencyResolver {
     /// - Returns: ResolvedDependency with results
     private func performResolution(for dependency: PodDependency) async -> ResolvedDependency {
         logger.debug("Starting resolution for dependency: \(dependency.name)")
-        
-        // Step 1: Get pod specification
+
+        // If the pod element already carries a git URL (from plugin.xml attributes),
+        // skip the CocoaPods registry lookup and resolve directly.
+        if let gitUrl = dependency.git {
+            logger.debug("Pod \(dependency.name) has direct git URL, bypassing CocoaPods lookup")
+            let podSpecInfo = PodSpecInfo(
+                name: dependency.name,
+                version: dependency.tag ?? dependency.spec ?? "",
+                sourceType: .git(url: gitUrl, tag: dependency.tag, branch: dependency.branch)
+            )
+            return await handleSourceType(podSpecInfo: podSpecInfo, dependency: dependency)
+        }
+
+        // Step 1: Get pod specification from CocoaPods registry
         guard let podSpecInfo = await podSpecResolver.resolvePodSpec(for: dependency) else {
             logger.debug("Pod spec not found for: \(dependency.name)")
             return ResolvedDependency(
@@ -101,7 +113,7 @@ public class DependencyResolver {
                 status: .podSpecNotFound
             )
         }
-        
+
         // Step 2: Handle different source types
         return await handleSourceType(podSpecInfo: podSpecInfo, dependency: dependency)
     }
@@ -293,10 +305,11 @@ public class DependencyResolver {
         return nil
     }
     
-    private func extractVersionTag(from spec: String) -> String? {
+    private func extractVersionTag(from spec: String?) -> String? {
+        guard let spec else { return nil }
         // Extract version from CocoaPods spec patterns
         // Examples: "2.2.1", "~> 4.0", ">= 1.0", "1.0.0"
-        
+
         // Remove common CocoaPods operators
         let cleanSpec = spec
             .replacingOccurrences(of: "~>", with: "")
@@ -305,12 +318,12 @@ public class DependencyResolver {
             .replacingOccurrences(of: ">", with: "")
             .replacingOccurrences(of: "<", with: "")
             .trimmingCharacters(in: .whitespaces)
-        
+
         // If it looks like a version number, return it
         if cleanSpec.range(of: #"^\d+(\.\d+)*"#, options: .regularExpression) != nil {
             return cleanSpec
         }
-        
+
         return nil
     }
 }

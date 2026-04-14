@@ -53,6 +53,24 @@ public class XMLParser {
         var allDependencies: [PodDependency] = []
         var hasPodspec = false
 
+        // Helper to parse pod elements from a podspec node
+        func parsePods(from podspec: XMLIndexer) {
+            let podElements = podspec["pods"]["pod"].all
+            for podElement in podElements {
+                guard let name = podElement.element?.attribute(by: "name")?.text else { continue }
+                let spec = podElement.element?.attribute(by: "spec")?.text
+                let git = podElement.element?.attribute(by: "git")?.text
+                let tag = podElement.element?.attribute(by: "tag")?.text
+                let branch = podElement.element?.attribute(by: "branch")?.text
+                // Require at least spec or git to create a dependency
+                guard spec != nil || git != nil else { continue }
+                let dependency = PodDependency(name: name, spec: spec, git: git, tag: tag, branch: branch)
+                if !allDependencies.contains(dependency) {
+                    allDependencies.append(dependency)
+                }
+            }
+        }
+
         // Look for podspec sections only in iOS platform
         for platform in xml["plugin"]["platform"].all {
             // Only process iOS platforms
@@ -60,20 +78,7 @@ public class XMLParser {
                platformName.lowercased() == "ios" {
                 if platform["podspec"].element != nil {
                     hasPodspec = true
-
-                    // Look for pod elements in the podspec
-                    let podElements = platform["podspec"]["pods"]["pod"].all
-
-                    for podElement in podElements {
-                        if let name = podElement.element?.attribute(by: "name")?.text,
-                           let spec = podElement.element?.attribute(by: "spec")?.text {
-                            let dependency = PodDependency(name: name, spec: spec)
-                            // Avoid duplicates
-                            if !allDependencies.contains(dependency) {
-                                allDependencies.append(dependency)
-                            }
-                        }
-                    }
+                    parsePods(from: platform["podspec"])
                 }
             }
         }

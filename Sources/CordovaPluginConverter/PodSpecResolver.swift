@@ -12,10 +12,10 @@ public class PodSpecResolver {
     /// - Parameter dependency: The CocoaPods dependency to resolve
     /// - Returns: PodSpecInfo if successfully resolved, nil otherwise
     public func resolvePodSpec(for dependency: PodDependency) async -> PodSpecInfo? {
-        logger.debug("Resolving pod spec for \(dependency.name) (\(dependency.spec))")
-        
+        logger.debug("Resolving pod spec for \(dependency.name) (\(dependency.spec ?? "no spec"))")
+
         do {
-            let podSpecInfo = try await fetchPodSpecInfo(name: dependency.name, version: dependency.spec)
+            let podSpecInfo = try await fetchPodSpecInfo(name: dependency.name, version: dependency.spec ?? "")
             logger.debug("Successfully resolved pod spec for \(dependency.name)")
             return podSpecInfo
         } catch {
@@ -40,13 +40,13 @@ public class PodSpecResolver {
     ///   - spec: The CocoaPods version specification
     ///   - sourceTag: Optional source tag that takes precedence over version spec
     /// - Returns: Equivalent SPM requirement
-    public static func convertSpecToSPMRequirement(_ spec: String, sourceTag: String? = nil) -> SPMRequirement {
-        let trimmedSpec = spec.trimmingCharacters(in: .whitespaces)
-        
+    public static func convertSpecToSPMRequirement(_ spec: String?, sourceTag: String? = nil) -> SPMRequirement {
         // If we have a source tag, prefer using it
         if let tag = sourceTag {
             return .tag(tag)
         }
+
+        let trimmedSpec = (spec ?? "").trimmingCharacters(in: .whitespaces)
         
         // Handle common CocoaPods version patterns
         if trimmedSpec.hasPrefix("~>") {
