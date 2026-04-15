@@ -1,5 +1,7 @@
 # cdv2spm - Cordova Plugin to Swift Package Manager Converter
 
+[![CI](https://github.com/andredestro/cordova-plugin-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/andredestro/cordova-plugin-converter/actions/workflows/ci.yml)
+
 A Swift command-line tool that converts Cordova `plugin.xml` files to Swift Package Manager `Package.swift` format, facilitating the migration from CocoaPods to Swift Package Manager for iOS Cordova plugins.
 
 ## Features
@@ -288,7 +290,7 @@ brew install swiftformat
 
 ### Testing
 
-The project includes comprehensive unit tests (**87 tests** covering all major components):
+The project includes comprehensive unit tests (**115 tests** covering all major components):
 
 ```bash
 # Run all tests
