@@ -111,12 +111,18 @@ public enum SPMRequirement: Equatable {
 public struct SPMDependency: Equatable {
     public let url: String
     public let requirement: SPMRequirement
+    /// Product name to use in target dependencies (e.g. "Alamofire")
     public let productName: String?
-    
-    public init(url: String, requirement: SPMRequirement, productName: String? = nil) {
+    /// Package name as declared in the dependency's Package.swift `name:` field.
+    /// Used for the `package:` label in `.product(name:package:)`.
+    /// Falls back to the repository name extracted from the URL when nil.
+    public let packageName: String?
+
+    public init(url: String, requirement: SPMRequirement, productName: String? = nil, packageName: String? = nil) {
         self.url = url
         self.requirement = requirement
         self.productName = productName
+        self.packageName = packageName
     }
 }
 

@@ -153,10 +153,9 @@ public class CordovaToSPMConverter {
         if options.autoResolve, metadata.hasDependencies {
             logger.info("Attempting automatic dependency resolution...")
             let resolver = DependencyResolver(logger: logger)
-            resolvedDependencies = await resolver.resolveCocoaPodDependencies(metadata.dependencies)
-            
-            // Display resolution results
-            displayResolutionResults(resolvedDependencies!)
+            let resolved = await resolver.resolveCocoaPodDependencies(metadata.dependencies)
+            resolvedDependencies = resolved
+            displayResolutionResults(resolved)
         }
 
         // Generate Package.swift content
@@ -167,8 +166,8 @@ public class CordovaToSPMConverter {
         )
 
         // Validate generated content
-        guard PackageGenerator.validatePackageSwiftSyntax(packageContent) else {
-            let errorInfo = [NSLocalizedDescriptionKey: "Generated Package.swift has invalid syntax"]
+        guard PackageGenerator.hasRequiredPackageElements(packageContent) else {
+            let errorInfo = [NSLocalizedDescriptionKey: "Generated Package.swift is missing required elements"]
             let validationError = NSError(domain: "ValidationError", code: 1, userInfo: errorInfo)
             throw FileOperationError.writeError(packageSwiftPath, validationError)
         }

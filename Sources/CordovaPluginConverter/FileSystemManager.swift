@@ -230,17 +230,17 @@ public class FileSystemManager {
         let headerURL = URL(fileURLWithPath: mostCommonDir)
 
         // Calculate relative path
-        let sourcePath = sourceURL.path
-        let headerPath = headerURL.path
+        let sourceAbsPath = sourceURL.path
+        let headerAbsPath = headerURL.path
 
         // If header directory is exactly the same as source directory
-        if headerPath == sourcePath {
+        if headerAbsPath == sourceAbsPath {
             return "."
         }
 
         // If header directory is a subdirectory of source
-        if headerPath.hasPrefix(sourcePath + "/") {
-            let relativePath = String(headerPath.dropFirst(sourcePath.count + 1))
+        if headerAbsPath.hasPrefix(sourceAbsPath + "/") {
+            let relativePath = String(headerAbsPath.dropFirst(sourceAbsPath.count + 1))
             return relativePath.isEmpty ? "." : relativePath
         }
 

@@ -68,9 +68,9 @@ final class PackageGeneratorTests: XCTestCase {
         )
         """
 
-        XCTAssertTrue(PackageGenerator.validatePackageSwiftSyntax(validPackage))
-        XCTAssertFalse(PackageGenerator.validatePackageSwiftSyntax(invalidPackage))
-        XCTAssertFalse(PackageGenerator.validatePackageSwiftSyntax(incompletePackage))
+        XCTAssertTrue(PackageGenerator.hasRequiredPackageElements(validPackage))
+        XCTAssertFalse(PackageGenerator.hasRequiredPackageElements(invalidPackage))
+        XCTAssertFalse(PackageGenerator.hasRequiredPackageElements(incompletePackage))
     }
 
     func testPackageContentStructure() {
@@ -192,6 +192,54 @@ final class PackageGeneratorTests: XCTestCase {
         // Should not contain publicHeadersPath when no FileSystemManager is provided
         XCTAssertFalse(packageContent.contains("publicHeadersPath"))
         XCTAssertTrue(packageContent.contains("path: \"src/ios\""))
+    }
+
+    func testGeneratePackageSwiftWithResolvedDependencies() {
+        let pod = PodDependency(name: "Alamofire", spec: "~> 5.0")
+        let unresolvedPod = PodDependency(name: "SomePod", spec: "1.0.0")
+
+        let resolvedDeps: [ResolvedDependency] = [
+            ResolvedDependency(
+                originalPod: pod,
+                spmDependency: SPMDependency(
+                    url: "https://github.com/Alamofire/Alamofire.git",
+                    requirement: .upToNextMajor("5.0.0"),
+                    productName: "Alamofire",
+                    packageName: "Alamofire"
+                ),
+                status: .resolved
+            ),
+            ResolvedDependency(
+                originalPod: unresolvedPod,
+                spmDependency: nil,
+                status: .noPackageSwift
+            )
+        ]
+
+        let metadata = PluginMetadata(
+            pluginId: "com.example.resolved",
+            dependencies: [pod, unresolvedPod],
+            hasPodspec: true,
+            originalXmlContent: ""
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(
+            from: metadata,
+            resolvedDependencies: resolvedDeps
+        )
+
+        // Resolved dependency should appear as a real .package entry
+        XCTAssertTrue(packageContent.contains("https://github.com/Alamofire/Alamofire.git"))
+        XCTAssertTrue(packageContent.contains(".upToNextMajor(from: \"5.0.0\")"))
+        XCTAssertTrue(packageContent.contains(".product(name: \"Alamofire\", package: \"Alamofire\")"))
+
+        // Unresolved dependency should appear as TODO comments
+        XCTAssertTrue(packageContent.contains("// TODO: Convert CocoaPods dependency: SomePod (1.0.0)"))
+        XCTAssertTrue(packageContent.contains("// TODO: Add Swift Package equivalent for: SomePod (1.0.0)"))
+
+        // Cordova-ios should still be present
+        XCTAssertTrue(packageContent.contains("cordova-ios.git"))
+        XCTAssertTrue(packageContent.contains(".product(name: \"Cordova\", package: \"cordova-ios\")"))
     }
 }
 

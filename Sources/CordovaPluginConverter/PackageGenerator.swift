@@ -109,8 +109,9 @@ public class PackageGenerator {
                 
                 // Add target dependency
                 let productName = spmDep.productName ?? resolvedDep.originalPod.name
+                let pkgName = spmDep.packageName ?? extractPackageName(from: spmDep.url)
                 let targetEntry = "                .product(name: \"\(productName)\", " +
-                    "package: \"\(extractPackageName(from: spmDep.url))\")"
+                    "package: \"\(pkgName)\")"
                 targetDependencies.append(targetEntry)
             } else {
                 // Add comment for unresolved dependency
@@ -157,11 +158,11 @@ public class PackageGenerator {
         return "UnknownPackage"
     }
 
-    /// Validate generated Package.swift syntax
-    /// - Parameter content: Package.swift content to validate
-    /// - Returns: true if syntax appears valid, false otherwise
-    public static func validatePackageSwiftSyntax(_ content: String) -> Bool {
-        // Basic syntax validation
+    /// Check that generated Package.swift contains all required top-level elements.
+    /// This is a structural presence check, not a Swift syntax validator.
+    /// - Parameter content: Package.swift content to check
+    /// - Returns: true if all required elements are present
+    public static func hasRequiredPackageElements(_ content: String) -> Bool {
         let requiredElements = [
             "swift-tools-version",
             "import PackageDescription",

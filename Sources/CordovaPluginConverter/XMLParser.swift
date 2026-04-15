@@ -49,16 +49,35 @@ public class XMLParser {
             throw XMLParsingError.missingPluginId
         }
 
+        // Collect Cordova variable preferences (name → default value).
+        // Plugin-level preferences are a baseline; platform-level ones override them.
+        func collectPreferences(from indexer: XMLIndexer) -> [String: String] {
+            var prefs: [String: String] = [:]
+            for pref in indexer["preference"].all {
+                if let name = pref.element?.attribute(by: "name")?.text,
+                   let defaultValue = pref.element?.attribute(by: "default")?.text {
+                    prefs[name] = defaultValue
+                }
+            }
+            return prefs
+        }
+
+        let pluginPreferences = collectPreferences(from: xml["plugin"])
+
         // Extract pod dependencies from all platforms
         var allDependencies: [PodDependency] = []
         var hasPodspec = false
 
         // Helper to parse pod elements from a podspec node
-        func parsePods(from podspec: XMLIndexer) {
+        func parsePods(from podspec: XMLIndexer, preferences: [String: String]) {
             let podElements = podspec["pods"]["pod"].all
             for podElement in podElements {
                 guard let name = podElement.element?.attribute(by: "name")?.text else { continue }
-                let spec = podElement.element?.attribute(by: "spec")?.text
+
+                // Resolve Cordova variable substitution in spec (e.g. "$MY_VERSION" → "1.2.3")
+                let rawSpec = podElement.element?.attribute(by: "spec")?.text
+                let spec = rawSpec.map { resolveVariable($0, using: preferences) }
+
                 let git = podElement.element?.attribute(by: "git")?.text
                 let tag = podElement.element?.attribute(by: "tag")?.text
                 let branch = podElement.element?.attribute(by: "branch")?.text
@@ -76,9 +95,13 @@ public class XMLParser {
             // Only process iOS platforms
             if let platformName = platform.element?.attribute(by: "name")?.text,
                platformName.lowercased() == "ios" {
+                // Merge plugin-level preferences with platform-level ones (platform wins)
+                var preferences = pluginPreferences
+                preferences.merge(collectPreferences(from: platform)) { _, new in new }
+
                 if platform["podspec"].element != nil {
                     hasPodspec = true
-                    parsePods(from: platform["podspec"])
+                    parsePods(from: platform["podspec"], preferences: preferences)
                 }
             }
         }
@@ -89,6 +112,15 @@ public class XMLParser {
             hasPodspec: hasPodspec,
             originalXmlContent: content
         )
+    }
+
+    /// Resolve a Cordova variable reference in a spec string.
+    /// If the value is exactly `$VAR_NAME`, returns the preference default for `VAR_NAME`.
+    /// Otherwise returns the original value unchanged.
+    private static func resolveVariable(_ value: String, using preferences: [String: String]) -> String {
+        guard value.hasPrefix("$") else { return value }
+        let varName = String(value.dropFirst())
+        return preferences[varName] ?? value
     }
 
     /// Generate updated plugin.xml content with iOS platform package attribute
@@ -127,29 +159,35 @@ public class XMLParser {
 
         // Second: Add nospm="true" attribute to pod elements (if requested)
         if addNospmAttribute {
-            let podPattern = #"<pod\s+([^>]*?)/?>"#
+            // Pattern matches <pod> tags whose attributes are double-quoted.
+            // Using `"[^"]*"` for each value means `>` inside quotes (e.g. spec="~> 3.0")
+            // is consumed as part of the value and never treated as the tag-close character.
+            let podPattern = #"<pod(?:\s+[^=\s>]+="[^"]*")*\s*/?>"#
             guard let podRegex = try? NSRegularExpression(pattern: podPattern, options: []) else {
-                return updatedContent // Return content if regex fails
+                return updatedContent
             }
 
-            let podMatches = podRegex.matches(in: updatedContent, range: NSRange(location: 0, length: (updatedContent as NSString).length))
+            let podMatches = podRegex.matches(
+                in: updatedContent,
+                range: NSRange(updatedContent.startIndex..., in: updatedContent)
+            )
 
             for match in podMatches.reversed() {
                 let matchedString = (updatedContent as NSString).substring(with: match.range)
-                let replacement: String = if matchedString.contains("nospm=") {
-                    // Replace existing nospm attribute with "true"
-                    matchedString.replacingOccurrences(
+                let replacement: String
+                if matchedString.contains("nospm=") {
+                    // Update existing nospm attribute in place
+                    replacement = matchedString.replacingOccurrences(
                         of: #"nospm="[^"]*""#,
                         with: #"nospm="true""#,
                         options: .regularExpression
                     )
+                } else if matchedString.hasSuffix("/>") {
+                    // Self-closing tag: insert before />
+                    replacement = String(matchedString.dropLast(2)) + " nospm=\"true\" />"
                 } else {
-                    // Add nospm="true" attribute - handle both self-closing and regular tags
-                    if matchedString.contains("/>") {
-                        matchedString.replacingOccurrences(of: "/>", with: " nospm=\"true\" />")
-                    } else {
-                        matchedString.replacingOccurrences(of: ">", with: " nospm=\"true\">")
-                    }
+                    // Regular tag: insert before the closing >
+                    replacement = String(matchedString.dropLast(1)) + " nospm=\"true\">"
                 }
 
                 updatedContent = (updatedContent as NSString).replacingCharacters(in: match.range, with: replacement)

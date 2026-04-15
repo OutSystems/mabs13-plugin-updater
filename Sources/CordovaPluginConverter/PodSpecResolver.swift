@@ -87,33 +87,39 @@ public class PodSpecResolver {
     // MARK: - Private Methods
     
     private func fetchPodSpecInfo(name: String, version: String) async throws -> PodSpecInfo {
-        let command = "pod spec cat \(name)"
-        let versionCommand = version.isEmpty ? command : "\(command) --version=\(version)"
-        
-        logger.debug("Executing: \(versionCommand)")
-        
+        // Build argument list without shell interpolation to prevent command injection
+        var arguments = ["pod", "spec", "cat", name]
+        if !version.isEmpty {
+            arguments.append("--version=\(version)")
+        }
+
+        logger.debug("Executing: \(arguments.joined(separator: " "))")
+
         let process = Process()
         process.launchPath = "/usr/bin/env"
-        process.arguments = ["bash", "-c", versionCommand]
-        
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        
+        process.arguments = arguments
+
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+
         return try await withCheckedThrowingContinuation { continuation in
             process.terminationHandler = { _ in
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                
+                let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
+
                 guard let output = String(data: data, encoding: .utf8) else {
                     continuation.resume(throwing: PodSpecError.invalidOutput("Could not decode pod spec output"))
                     return
                 }
-                
+
                 if process.terminationStatus != 0 {
-                    continuation.resume(throwing: PodSpecError.commandFailed("pod spec cat failed: \(output)"))
+                    let errData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errOutput = String(data: errData, encoding: .utf8) ?? output
+                    continuation.resume(throwing: PodSpecError.commandFailed("pod spec cat failed: \(errOutput)"))
                     return
                 }
-                
+
                 do {
                     let podSpecInfo = try self.parsePodSpecOutput(output, name: name, version: version)
                     continuation.resume(returning: podSpecInfo)
@@ -121,7 +127,7 @@ public class PodSpecResolver {
                     continuation.resume(throwing: error)
                 }
             }
-            
+
             do {
                 try process.run()
             } catch {

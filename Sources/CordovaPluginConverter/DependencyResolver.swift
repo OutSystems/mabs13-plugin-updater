@@ -199,13 +199,14 @@ public class DependencyResolver {
             sourceTag: tag
         )
         
-        // Use the parsed package info to get the main library name
+        // Use the parsed package info to get the main library name and the declared package name
         let productName = packageInfo.products.first(where: { $0.type == .library })?.name ?? packageInfo.name
-        
+
         let spmDependency = SPMDependency(
             url: url,
             requirement: requirement,
-            productName: productName
+            productName: productName,
+            packageName: packageInfo.name
         )
         
         return ResolvedDependency(

@@ -143,12 +143,10 @@ public class SwiftImportManager {
             "CDVWhitelist"
         ]
         
-        for pattern in cordovaPatterns {
-            if content.contains(pattern) {
-                return true
-            }
+        for pattern in cordovaPatterns where content.contains(pattern) {
+            return true
         }
-        
+
         return false
     }
     
@@ -176,22 +174,23 @@ public class SwiftImportManager {
             newLines.append(line)
         }
         
-        // If no imports were found, add at the beginning after any initial comments
+        // If no imports were found, add after any initial comment/license block
         if !importAdded {
-            var insertIndex = 0
-            
-            // Skip initial comments and empty lines
+            // Default: append at the end (handles files that are entirely comments)
+            var insertIndex = lines.count
+
+            // Find the first line that is not a comment or blank — insert before it
             for (index, line) in lines.enumerated() {
                 let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-                if !trimmedLine.isEmpty && 
-                   !trimmedLine.hasPrefix("//") && 
-                   !trimmedLine.hasPrefix("/*") && 
+                if !trimmedLine.isEmpty &&
+                   !trimmedLine.hasPrefix("//") &&
+                   !trimmedLine.hasPrefix("/*") &&
                    !trimmedLine.hasPrefix("*") {
                     insertIndex = index
                     break
                 }
             }
-            
+
             newLines = Array(lines[0..<insertIndex])
             newLines.append("#if canImport(Cordova)")
             newLines.append("import Cordova")

@@ -40,10 +40,12 @@ public enum LogLevel: String, CaseIterable {
     }
 }
 
-/// Logger class with color support and level filtering
+/// Logger class with color support and level filtering.
+/// Thread-safe: concurrent async tasks can log without interleaving lines.
 public class Logger {
     private let verbose: Bool
     private let noColor: Bool
+    private let queue = DispatchQueue(label: "cdv2spm.logger")
 
     public init(verbose: Bool = false, noColor: Bool = false) {
         self.verbose = verbose
@@ -63,10 +65,12 @@ public class Logger {
         let prefix = level.prefix
         let coloredMessage = noColor ? "\(prefix) \(message)" : level.color.colorize("\(prefix) \(message)")
 
-        if level == .error {
-            fputs(coloredMessage + "\n", stderr)
-        } else {
-            print(coloredMessage)
+        queue.sync {
+            if level == .error {
+                fputs(coloredMessage + "\n", stderr)
+            } else {
+                print(coloredMessage)
+            }
         }
     }
 

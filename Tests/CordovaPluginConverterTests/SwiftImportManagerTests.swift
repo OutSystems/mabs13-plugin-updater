@@ -136,12 +136,51 @@ final class SwiftImportManagerTests: XCTestCase {
     
     func testHandleNoSrcIOSDirectory() {
         // Don't create src/ios directory
-        
+
         // Run the import manager
         let success = swiftImportManager.addCordovaImports(in: tempDirectory.path)
-        
+
         // Should succeed (nothing to do)
         XCTAssertTrue(success)
+    }
+
+    func testAddCordovaImportToFileWithOnlyComments() {
+        // Create src/ios directory structure
+        let srcIOSDir = tempDirectory.appendingPathComponent("src/ios")
+        try! Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
+
+        // Create a Swift file that is entirely a license comment block followed by CDV usage
+        // This exercises the insertIndex = lines.count fallback path
+        let swiftFile = srcIOSDir.appendingPathComponent("LicenseOnly.swift")
+        let swiftContent = """
+        // Copyright (c) 2024 Example Corp.
+        // Licensed under the MIT License.
+        //
+        // This file uses CDVPlugin to implement a plugin.
+        class LicensePlugin: CDVPlugin {}
+        """
+
+        try! swiftContent.write(to: swiftFile, atomically: true, encoding: .utf8)
+
+        let success = swiftImportManager.addCordovaImports(in: tempDirectory.path)
+
+        XCTAssertTrue(success)
+
+        let updatedContent = try! String(contentsOf: swiftFile)
+        XCTAssertTrue(updatedContent.contains("#if canImport(Cordova)"))
+        XCTAssertTrue(updatedContent.contains("import Cordova"))
+        XCTAssertTrue(updatedContent.contains("#endif"))
+
+        // The import block must appear before the class declaration
+        let lines = updatedContent.components(separatedBy: .newlines)
+        let importBlockIndex = lines.firstIndex { $0.contains("#if canImport(Cordova)") }
+        let classLineIndex = lines.firstIndex { $0.hasPrefix("class LicensePlugin") }
+
+        XCTAssertNotNil(importBlockIndex)
+        XCTAssertNotNil(classLineIndex)
+        if let imp = importBlockIndex, let cls = classLineIndex {
+            XCTAssertLessThan(imp, cls)
+        }
     }
     
     func testProcessMultipleSwiftFiles() {

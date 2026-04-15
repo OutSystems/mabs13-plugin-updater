@@ -2,13 +2,13 @@ import ArgumentParser
 import Foundation
 
 @main
-struct Cdv2spm: ParsableCommand {
+struct Cdv2spm: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "cdv2spm",
         abstract: "Cordova plugin.xml to Swift Package Manager converter",
         discussion: """
-        A Swift command-line tool that converts Cordova plugin.xml files to Swift Package Manager 
-        Package.swift format, facilitating the migration from CocoaPods to Swift Package Manager 
+        A Swift command-line tool that converts Cordova plugin.xml files to Swift Package Manager
+        Package.swift format, facilitating the migration from CocoaPods to Swift Package Manager
         for iOS Cordova plugins.
         """,
         version: "1.0.0"
@@ -35,7 +35,7 @@ struct Cdv2spm: ParsableCommand {
     @Argument(help: "Path to plugin.xml file (defaults to ./plugin.xml)")
     var pluginXmlPath: String?
 
-    func run() throws {
+    func run() async throws {
         let options = ConversionOptions(
             force: force,
             dryRun: dryRun,
@@ -47,18 +47,8 @@ struct Cdv2spm: ParsableCommand {
         )
 
         let converter = CordovaToSPMConverter(options: options)
-        
-        // Execute async method synchronously using semaphore
-        let semaphore = DispatchSemaphore(value: 0)
-        var success = false
-        
-        Task {
-            success = await converter.convert()
-            semaphore.signal()
-        }
-        
-        semaphore.wait()
-        
+        let success = await converter.convert()
+
         if !success {
             throw ExitCode.failure
         }

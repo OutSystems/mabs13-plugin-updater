@@ -158,6 +158,44 @@ final class XMLParserBasicTests: XCTestCase {
         XCTAssertTrue(updatedXML.contains("AnotherPod"))
     }
 
+    func testGenerateUpdatedXMLHandlesVersionSpecWithGreaterThan() {
+        // Regression test: spec values like "~> 3.0" contain ">" which previously caused
+        // the regex to stop early, producing malformed XML.
+        let originalXML = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="test.plugin" version="1.0.0">
+            <platform name="ios">
+                <podspec>
+                    <pods>
+                        <pod name="ComplexDependency" spec="~> 3.0"/>
+                        <pod name="AnotherDep" spec=">= 2.0.0"/>
+                    </pods>
+                </podspec>
+            </platform>
+        </plugin>
+        """
+
+        let metadata = PluginMetadata(
+            pluginId: "test.plugin",
+            dependencies: [
+                PodDependency(name: "ComplexDependency", spec: "~> 3.0"),
+                PodDependency(name: "AnotherDep", spec: ">= 2.0.0")
+            ],
+            hasPodspec: true,
+            originalXmlContent: originalXML
+        )
+
+        let updatedXML = XMLParser.generateUpdatedXML(from: metadata)
+
+        // nospm must be added as a proper attribute, not spliced into an attribute value
+        XCTAssertTrue(updatedXML.contains("nospm=\"true\""))
+        XCTAssertTrue(updatedXML.contains("spec=\"~> 3.0\""), "spec value must be preserved intact")
+        XCTAssertTrue(updatedXML.contains("spec=\">= 2.0.0\""), "spec value must be preserved intact")
+        // Ensure the XML is well-formed (no attribute value was broken)
+        XCTAssertFalse(updatedXML.contains("spec=\"~\""), "spec value must not be truncated at >")
+        XCTAssertFalse(updatedXML.contains("spec=\"\""), "spec value must not be emptied")
+    }
+
     func testGenerateUpdatedXMLAddsSwiftPackage() {
         let originalXML = """
         <plugin id="test.plugin">
@@ -236,5 +274,81 @@ final class XMLParserBasicTests: XCTestCase {
         XCTAssertEqual(metadata.dependencies.count, 1)
         XCTAssertEqual(metadata.dependencies.first?.name, "IOSOnlyPod")
         XCTAssertTrue(metadata.hasPodspec)
+    }
+
+    func testParseXMLResolvesCoroadovaVariableSpecFromPlatformPreference() throws {
+        // Regression: spec="$IOS_FIREBASE_PERFORMANCE_VERSION" should be resolved to
+        // the default value declared in the <preference> element of the same platform.
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.firebase" version="1.0.0" xmlns="http://apache.org/cordova/ns/plugins/1.0">
+            <platform name="ios">
+                <preference name="IOS_FIREBASE_PERFORMANCE_VERSION" default="10.23.0"/>
+                <podspec>
+                    <pods use-frameworks="true">
+                        <pod name="FirebasePerformance" spec="$IOS_FIREBASE_PERFORMANCE_VERSION" />
+                    </pods>
+                </podspec>
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.dependencies.count, 1)
+        XCTAssertTrue(metadata.hasPodspec)
+
+        let firebase = metadata.dependencies.first
+        XCTAssertEqual(firebase?.name, "FirebasePerformance")
+        // The variable must be resolved to the preference default, not kept as "$..."
+        XCTAssertEqual(firebase?.spec, "10.23.0")
+    }
+
+    func testParseXMLResolvesCoroadovaVariableSpecFromPluginLevelPreference() throws {
+        // Preferences can also be declared at the plugin level (outside any platform).
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.plugin" version="1.0.0" xmlns="http://apache.org/cordova/ns/plugins/1.0">
+            <preference name="MY_LIB_VERSION" default="3.1.4"/>
+            <platform name="ios">
+                <podspec>
+                    <pods>
+                        <pod name="MyLib" spec="$MY_LIB_VERSION" />
+                    </pods>
+                </podspec>
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.dependencies.count, 1)
+        let myLib = metadata.dependencies.first
+        XCTAssertEqual(myLib?.name, "MyLib")
+        XCTAssertEqual(myLib?.spec, "3.1.4")
+    }
+
+    func testParseXMLKeepsUnresolvableVariableSpecUnchanged() throws {
+        // If a variable has no matching <preference>, keep the raw "$VAR" value so
+        // the dependency is still created (and gets a useful TODO comment).
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.plugin" version="1.0.0" xmlns="http://apache.org/cordova/ns/plugins/1.0">
+            <platform name="ios">
+                <podspec>
+                    <pods>
+                        <pod name="SomeLib" spec="$UNDEFINED_VAR" />
+                    </pods>
+                </podspec>
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.dependencies.count, 1)
+        let someLib = metadata.dependencies.first
+        XCTAssertEqual(someLib?.name, "SomeLib")
+        XCTAssertEqual(someLib?.spec, "$UNDEFINED_VAR") // kept as-is
     }
 }
