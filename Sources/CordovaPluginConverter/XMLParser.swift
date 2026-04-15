@@ -49,8 +49,8 @@ public class XMLParser {
             throw XMLParsingError.missingPluginId
         }
 
-        // Collect Cordova variable preferences (name → default value).
-        // Plugin-level preferences are a baseline; platform-level ones override them.
+        /// Collect Cordova variable preferences (name → default value).
+        /// Plugin-level preferences are a baseline; platform-level ones override them.
         func collectPreferences(from indexer: XMLIndexer) -> [String: String] {
             var prefs: [String: String] = [:]
             for pref in indexer["preference"].all {
@@ -69,7 +69,7 @@ public class XMLParser {
         var hasPodspec = false
         var localFrameworks: [LocalXCFramework] = []
 
-        // Helper to parse pod elements from a podspec node
+        /// Helper to parse pod elements from a podspec node
         func parsePods(from podspec: XMLIndexer, preferences: [String: String]) {
             let podElements = podspec["pods"]["pod"].all
             for podElement in podElements {
@@ -189,20 +189,19 @@ public class XMLParser {
 
             for match in podMatches.reversed() {
                 let matchedString = (updatedContent as NSString).substring(with: match.range)
-                let replacement: String
-                if matchedString.contains("nospm=") {
+                let replacement: String = if matchedString.contains("nospm=") {
                     // Update existing nospm attribute in place
-                    replacement = matchedString.replacingOccurrences(
+                    matchedString.replacingOccurrences(
                         of: #"nospm="[^"]*""#,
                         with: #"nospm="true""#,
                         options: .regularExpression
                     )
                 } else if matchedString.hasSuffix("/>") {
                     // Self-closing tag: insert before />
-                    replacement = String(matchedString.dropLast(2)) + " nospm=\"true\" />"
+                    String(matchedString.dropLast(2)) + " nospm=\"true\" />"
                 } else {
                     // Regular tag: insert before the closing >
-                    replacement = String(matchedString.dropLast(1)) + " nospm=\"true\">"
+                    String(matchedString.dropLast(1)) + " nospm=\"true\">"
                 }
 
                 updatedContent = (updatedContent as NSString).replacingCharacters(in: match.range, with: replacement)

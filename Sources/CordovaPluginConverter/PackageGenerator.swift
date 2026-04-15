@@ -66,7 +66,7 @@ public class PackageGenerator {
         return """
         // swift-tools-version:5.9
         import PackageDescription
-
+        
         let package = Package(
             name: "\(packageName)",
             platforms: [.iOS(.v14)],

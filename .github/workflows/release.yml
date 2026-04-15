@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build arm64
+        run: swift build -c release --arch arm64
+
+      - name: Build x86_64
+        run: swift build -c release --arch x86_64
+
+      - name: Create universal binary
+        run: |
+          lipo -create \
+            .build/arm64-apple-macosx/release/cdv2spm \
+            .build/x86_64-apple-macosx/release/cdv2spm \
+            -output cdv2spm
+          chmod +x cdv2spm
+
+      - name: Package binary
+        run: |
+          zip cdv2spm-${{ github.ref_name }}-macos.zip cdv2spm
+          shasum -a 256 cdv2spm-${{ github.ref_name }}-macos.zip > cdv2spm-${{ github.ref_name }}-macos.zip.sha256
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            cdv2spm-${{ github.ref_name }}-macos.zip \
+            cdv2spm-${{ github.ref_name }}-macos.zip.sha256 \
+            --title "cdv2spm ${{ github.ref_name }}" \
+            --generate-notes

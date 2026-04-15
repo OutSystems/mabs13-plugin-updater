@@ -45,7 +45,7 @@ final class PackageGeneratorTests: XCTestCase {
         let validPackage = """
         // swift-tools-version:5.9
         import PackageDescription
-
+        
         let package = Package(
             name: "TestPackage",
             targets: [
@@ -61,7 +61,7 @@ final class PackageGeneratorTests: XCTestCase {
         let incompletePackage = """
         // swift-tools-version:5.9
         import PackageDescription
-
+        
         let package = Package(
             name: "TestPackage"
             // Missing targets
@@ -305,7 +305,7 @@ final class PackageGeneratorTests: XCTestCase {
     }
 }
 
-// Mock FileSystemManager for testing
+/// Mock FileSystemManager for testing
 class MockFileSystemManager: FileSystemManager {
     override func findPublicHeadersPath(in _: String) -> String {
         // Mock behavior: always return "." to simulate headers in same directory

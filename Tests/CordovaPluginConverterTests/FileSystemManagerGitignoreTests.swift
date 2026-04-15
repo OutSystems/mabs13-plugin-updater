@@ -65,7 +65,7 @@ final class FileSystemManagerGitignoreTests: XCTestCase {
         # Xcode
         *.xcodeproj/
         DerivedData/
-
+        
         # macOS
         .DS_Store
         """
@@ -105,7 +105,7 @@ final class FileSystemManagerGitignoreTests: XCTestCase {
         .build/
         .swiftpm/
         Package.resolved
-
+        
         # Other stuff
         .DS_Store
         """
@@ -133,7 +133,7 @@ final class FileSystemManagerGitignoreTests: XCTestCase {
         let existingContent = """
         # Existing content
         .DS_Store
-
+        
         # Swift Package Manager
         .build/
         """
@@ -212,24 +212,24 @@ final class FileSystemManagerGitignoreTests: XCTestCase {
         # Logs
         logs/
         *.log
-
+        
         # Runtime data
         pids/
         *.pid
-
+        
         # Coverage directory used by tools like istanbul
         coverage/
-
+        
         # Dependency directories
         node_modules/
-
+        
         # Optional npm cache directory
         .npm
-
+        
         # Build artifacts
         dist/
         build/
-
+        
         """
         try fileManager.writeFile(content: existingContent, to: gitignorePath)
 

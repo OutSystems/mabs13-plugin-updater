@@ -10,7 +10,7 @@ final class XMLParserBasicTests: XCTestCase {
                 version="1.0.0">
             <name>Test Plugin</name>
             <description>A test plugin</description>
-
+        
             <platform name="ios">
                 <podspec>
                     <pods>

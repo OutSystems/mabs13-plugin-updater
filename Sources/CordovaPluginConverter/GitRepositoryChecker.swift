@@ -5,6 +5,7 @@ public class GitRepositoryChecker {
     private let logger: Logger
 
     // MARK: - Static Regex Constants
+
     // Compiled once at class load time; patterns are literals and never fail.
 
     private static let githubPatterns: [NSRegularExpression] = [
@@ -19,7 +20,7 @@ public class GitRepositoryChecker {
         )
     ]
 
-    // Matches any host whose name contains "gitlab" (e.g. gitlab.com, gitlab.mycompany.com)
+    /// Matches any host whose name contains "gitlab" (e.g. gitlab.com, gitlab.mycompany.com)
     private static let gitlabPattern = try! NSRegularExpression(
         pattern: #"([^:/]*gitlab[^:/]*)[:/](.+?)(?:\.git)?/?$"#
     )

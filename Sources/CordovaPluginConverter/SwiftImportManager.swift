@@ -160,7 +160,7 @@ public class SwiftImportManager {
             let trimmedLine = line.trimmingCharacters(in: .whitespaces)
             
             // If this is an import line and we haven't added our import yet
-            if trimmedLine.hasPrefix("import ") && !foundFirstImport {
+            if trimmedLine.hasPrefix("import "), !foundFirstImport {
                 foundFirstImport = true
                 
                 // Add the conditional Cordova import before the first existing import
@@ -182,16 +182,16 @@ public class SwiftImportManager {
             // Find the first line that is not a comment or blank — insert before it
             for (index, line) in lines.enumerated() {
                 let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-                if !trimmedLine.isEmpty &&
-                   !trimmedLine.hasPrefix("//") &&
-                   !trimmedLine.hasPrefix("/*") &&
+                if !trimmedLine.isEmpty,
+                   !trimmedLine.hasPrefix("//"),
+                   !trimmedLine.hasPrefix("/*"),
                    !trimmedLine.hasPrefix("*") {
                     insertIndex = index
                     break
                 }
             }
 
-            newLines = Array(lines[0..<insertIndex])
+            newLines = Array(lines[0 ..< insertIndex])
             newLines.append("#if canImport(Cordova)")
             newLines.append("import Cordova")
             newLines.append("#endif")

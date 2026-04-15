@@ -182,8 +182,7 @@ public class FileSystemManager {
                 logger.debug("Found \(headerFiles.count) header files in \(sourcePath)")
                 // Find the most common directory containing headers
                 let headerDirs = headerFiles.compactMap { URL(fileURLWithPath: $0).deletingLastPathComponent().path }
-                let mostCommonDir = findMostCommonDirectory(in: headerDirs, relativeTo: fullSourcePath)
-                return mostCommonDir
+                return findMostCommonDirectory(in: headerDirs, relativeTo: fullSourcePath)
             }
         }
 

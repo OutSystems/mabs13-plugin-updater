@@ -42,8 +42,8 @@ public enum PodSourceType: Equatable {
         switch self {
         case let .git(url, tag, branch):
             var desc = "Git: \(url)"
-            if let tag = tag { desc += " (tag: \(tag))" }
-            if let branch = branch { desc += " (branch: \(branch))" }
+            if let tag { desc += " (tag: \(tag))" }
+            if let branch { desc += " (branch: \(branch))" }
             return desc
         case let .http(url):
             return "HTTP: \(url)"
@@ -210,9 +210,9 @@ public enum ResolutionStatus: Equatable {
     case notALibrary
     case timeout
     case error(String)
-    case httpSourceFound(gitUrl: String?)  // HTTP source found, optionally with inferred Git URL
-    case xcframeworkFound(gitUrl: String?, downloadUrl: String)  // XCFramework found
-    case requiresManualIntegration(reason: String)  // Cannot be automatically converted
+    case httpSourceFound(gitUrl: String?) // HTTP source found, optionally with inferred Git URL
+    case xcframeworkFound(gitUrl: String?, downloadUrl: String) // XCFramework found
+    case requiresManualIntegration(reason: String) // Cannot be automatically converted
     
     public var description: String {
         switch self {

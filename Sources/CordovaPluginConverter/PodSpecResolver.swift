@@ -210,8 +210,6 @@ public class PodSpecResolver {
         logger.debug("Unknown source type for \(podName): \(source)")
         return .unknown
     }
-    
-
 }
 
 /// Errors that can occur during pod spec resolution

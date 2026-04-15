@@ -2,7 +2,6 @@ import XCTest
 @testable import cdv2spm
 
 final class PodSpecVersionConversionTests: XCTestCase {
-    
     func testExactVersionConversion() {
         // Test exact versions
         XCTAssertEqual(PodSpecResolver.convertSpecToSPMRequirement("1.0.0"), .exact("1.0.0"))
@@ -25,7 +24,7 @@ final class PodSpecVersionConversionTests: XCTestCase {
         XCTAssertEqual(PodSpecResolver.convertSpecToSPMRequirement("~> 2.1"), .upToNextMajor("2.1"))
         XCTAssertEqual(PodSpecResolver.convertSpecToSPMRequirement("~>2.1"), .upToNextMajor("2.1"))
         
-        // ~> 2.1.0 means >= 2.1.0 and < 2.2.0 (upToNextMinor)  
+        // ~> 2.1.0 means >= 2.1.0 and < 2.2.0 (upToNextMinor)
         XCTAssertEqual(PodSpecResolver.convertSpecToSPMRequirement("~> 2.1.0"), .upToNextMinor("2.1.0"))
         XCTAssertEqual(PodSpecResolver.convertSpecToSPMRequirement("~> 2.1.3"), .upToNextMinor("2.1.3"))
         XCTAssertEqual(PodSpecResolver.convertSpecToSPMRequirement("~>2.1.3"), .upToNextMinor("2.1.3"))

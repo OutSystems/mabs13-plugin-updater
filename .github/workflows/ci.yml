@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: swift build -c release
+
+      - name: Run tests
+        run: swift test
+
+      - name: Lint (SwiftLint)
+        run: |
+          if command -v swiftlint &>/dev/null; then
+            swiftlint --strict
+          else
+            brew install swiftlint && swiftlint --strict
+          fi

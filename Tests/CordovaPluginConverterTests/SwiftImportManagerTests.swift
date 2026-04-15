@@ -30,10 +30,10 @@ final class SwiftImportManagerTests: XCTestCase {
         super.tearDown()
     }
     
-    func testAddCordovaImportToSwiftFileWithCDVPlugin() {
+    func testAddCordovaImportToSwiftFileWithCDVPlugin() throws {
         // Create src/ios directory structure
         let srcIOSDir = tempDirectory.appendingPathComponent("src/ios")
-        try! Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
+        try Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
         
         // Create a Swift file that needs Cordova import
         let swiftFile = srcIOSDir.appendingPathComponent("TestPlugin.swift")
@@ -49,7 +49,7 @@ final class SwiftImportManagerTests: XCTestCase {
         }
         """
         
-        try! swiftContent.write(to: swiftFile, atomically: true, encoding: .utf8)
+        try swiftContent.write(to: swiftFile, atomically: true, encoding: .utf8)
         
         // Run the import manager
         let success = swiftImportManager.addCordovaImports(in: tempDirectory.path)
@@ -57,7 +57,7 @@ final class SwiftImportManagerTests: XCTestCase {
         XCTAssertTrue(success)
         
         // Check if the import was added
-        let updatedContent = try! String(contentsOf: swiftFile)
+        let updatedContent = try String(contentsOf: swiftFile)
         XCTAssertTrue(updatedContent.contains("#if canImport(Cordova)"))
         XCTAssertTrue(updatedContent.contains("import Cordova"))
         XCTAssertTrue(updatedContent.contains("#endif"))
@@ -69,13 +69,13 @@ final class SwiftImportManagerTests: XCTestCase {
         
         XCTAssertNotNil(cordovaImportIndex)
         XCTAssertNotNil(foundationImportIndex)
-        XCTAssertLessThan(cordovaImportIndex!, foundationImportIndex!)
+        XCTAssertLessThan(try XCTUnwrap(cordovaImportIndex), try XCTUnwrap(foundationImportIndex))
     }
     
-    func testSkipSwiftFileWithoutCordovaReferences() {
+    func testSkipSwiftFileWithoutCordovaReferences() throws {
         // Create src/ios directory structure
         let srcIOSDir = tempDirectory.appendingPathComponent("src/ios")
-        try! Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
+        try Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
         
         // Create a Swift file that doesn't need Cordova import
         let swiftFile = srcIOSDir.appendingPathComponent("Utility.swift")
@@ -89,7 +89,7 @@ final class SwiftImportManagerTests: XCTestCase {
         }
         """
         
-        try! swiftContent.write(to: swiftFile, atomically: true, encoding: .utf8)
+        try swiftContent.write(to: swiftFile, atomically: true, encoding: .utf8)
         
         // Run the import manager
         let success = swiftImportManager.addCordovaImports(in: tempDirectory.path)
@@ -97,16 +97,16 @@ final class SwiftImportManagerTests: XCTestCase {
         XCTAssertTrue(success)
         
         // Check that no import was added
-        let updatedContent = try! String(contentsOf: swiftFile)
+        let updatedContent = try String(contentsOf: swiftFile)
         XCTAssertFalse(updatedContent.contains("#if canImport(Cordova)"))
         XCTAssertFalse(updatedContent.contains("import Cordova"))
         XCTAssertEqual(updatedContent, swiftContent) // Content should be unchanged
     }
     
-    func testSkipSwiftFileWithExistingCordovaImport() {
+    func testSkipSwiftFileWithExistingCordovaImport() throws {
         // Create src/ios directory structure
         let srcIOSDir = tempDirectory.appendingPathComponent("src/ios")
-        try! Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
+        try Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
         
         // Create a Swift file that already has Cordova import
         let swiftFile = srcIOSDir.appendingPathComponent("ExistingPlugin.swift")
@@ -122,7 +122,7 @@ final class SwiftImportManagerTests: XCTestCase {
         }
         """
         
-        try! swiftContent.write(to: swiftFile, atomically: true, encoding: .utf8)
+        try swiftContent.write(to: swiftFile, atomically: true, encoding: .utf8)
         
         // Run the import manager
         let success = swiftImportManager.addCordovaImports(in: tempDirectory.path)
@@ -130,7 +130,7 @@ final class SwiftImportManagerTests: XCTestCase {
         XCTAssertTrue(success)
         
         // Check that content is unchanged
-        let updatedContent = try! String(contentsOf: swiftFile)
+        let updatedContent = try String(contentsOf: swiftFile)
         XCTAssertEqual(updatedContent, swiftContent)
     }
     
@@ -144,10 +144,10 @@ final class SwiftImportManagerTests: XCTestCase {
         XCTAssertTrue(success)
     }
 
-    func testAddCordovaImportToFileWithOnlyComments() {
+    func testAddCordovaImportToFileWithOnlyComments() throws {
         // Create src/ios directory structure
         let srcIOSDir = tempDirectory.appendingPathComponent("src/ios")
-        try! Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
+        try Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
 
         // Create a Swift file that is entirely a license comment block followed by CDV usage
         // This exercises the insertIndex = lines.count fallback path
@@ -160,13 +160,13 @@ final class SwiftImportManagerTests: XCTestCase {
         class LicensePlugin: CDVPlugin {}
         """
 
-        try! swiftContent.write(to: swiftFile, atomically: true, encoding: .utf8)
+        try swiftContent.write(to: swiftFile, atomically: true, encoding: .utf8)
 
         let success = swiftImportManager.addCordovaImports(in: tempDirectory.path)
 
         XCTAssertTrue(success)
 
-        let updatedContent = try! String(contentsOf: swiftFile)
+        let updatedContent = try String(contentsOf: swiftFile)
         XCTAssertTrue(updatedContent.contains("#if canImport(Cordova)"))
         XCTAssertTrue(updatedContent.contains("import Cordova"))
         XCTAssertTrue(updatedContent.contains("#endif"))
@@ -183,10 +183,10 @@ final class SwiftImportManagerTests: XCTestCase {
         }
     }
     
-    func testProcessMultipleSwiftFiles() {
+    func testProcessMultipleSwiftFiles() throws {
         // Create src/ios directory structure
         let srcIOSDir = tempDirectory.appendingPathComponent("src/ios")
-        try! Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
+        try Foundation.FileManager.default.createDirectory(at: srcIOSDir, withIntermediateDirectories: true)
         
         // Create multiple Swift files
         let plugin1 = srcIOSDir.appendingPathComponent("Plugin1.swift")
@@ -217,9 +217,9 @@ final class SwiftImportManagerTests: XCTestCase {
         }
         """
         
-        try! plugin1Content.write(to: plugin1, atomically: true, encoding: .utf8)
-        try! plugin2Content.write(to: plugin2, atomically: true, encoding: .utf8)
-        try! utilityContent.write(to: utilityFile, atomically: true, encoding: .utf8)
+        try plugin1Content.write(to: plugin1, atomically: true, encoding: .utf8)
+        try plugin2Content.write(to: plugin2, atomically: true, encoding: .utf8)
+        try utilityContent.write(to: utilityFile, atomically: true, encoding: .utf8)
         
         // Run the import manager
         let success = swiftImportManager.addCordovaImports(in: tempDirectory.path)
@@ -227,15 +227,15 @@ final class SwiftImportManagerTests: XCTestCase {
         XCTAssertTrue(success)
         
         // Check plugin1 - should have import added
-        let updatedPlugin1 = try! String(contentsOf: plugin1)
+        let updatedPlugin1 = try String(contentsOf: plugin1)
         XCTAssertTrue(updatedPlugin1.contains("#if canImport(Cordova)"))
         
         // Check plugin2 - should have import added
-        let updatedPlugin2 = try! String(contentsOf: plugin2)
+        let updatedPlugin2 = try String(contentsOf: plugin2)
         XCTAssertTrue(updatedPlugin2.contains("#if canImport(Cordova)"))
         
         // Check utility - should NOT have import added
-        let updatedUtility = try! String(contentsOf: utilityFile)
+        let updatedUtility = try String(contentsOf: utilityFile)
         XCTAssertFalse(updatedUtility.contains("#if canImport(Cordova)"))
         XCTAssertEqual(updatedUtility, utilityContent)
     }
