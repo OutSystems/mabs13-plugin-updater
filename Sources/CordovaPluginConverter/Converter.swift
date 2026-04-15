@@ -85,6 +85,10 @@ public class CordovaToSPMConverter {
         return try XMLParser.parsePluginXML(at: path)
     }
 
+}
+
+// MARK: - Display Helpers
+extension CordovaToSPMConverter {
     private func displayPluginInfo(_ metadata: PluginMetadata) {
         logger.info("Plugin ID: \(metadata.pluginId)")
 

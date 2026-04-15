@@ -155,7 +155,8 @@ public class PodSpecResolver {
             // Extract and determine source type
             let sourceType = extractSourceType(from: json, podName: name)
             
-            logger.debug("Parsed pod spec for \(name): version=\(extractedVersion), sourceType=\(sourceType.description)")
+            let sourceDesc = sourceType.description
+            logger.debug("Parsed pod spec for \(name): version=\(extractedVersion), sourceType=\(sourceDesc)")
             
             return PodSpecInfo(
                 name: name,

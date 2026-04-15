@@ -14,10 +14,14 @@ final class SwiftImportManagerTests: XCTestCase {
         tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("SwiftImportManagerTests-\(UUID().uuidString)")
         
-        try! Foundation.FileManager.default.createDirectory(
-            at: tempDirectory,
-            withIntermediateDirectories: true
-        )
+        do {
+            try Foundation.FileManager.default.createDirectory(
+                at: tempDirectory,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            XCTFail("Failed to create temp directory: \(error)")
+        }
         
         logger = Logger(verbose: false)
         fileManager = FileSystemManager(logger: logger, dryRun: false)

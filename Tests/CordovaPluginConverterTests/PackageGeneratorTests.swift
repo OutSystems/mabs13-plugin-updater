@@ -1,6 +1,7 @@
 import XCTest
 @testable import cdv2spm
 
+// swiftlint:disable:next type_body_length
 final class PackageGeneratorTests: XCTestCase {
     func testGeneratePackageSwiftFromMetadata() {
         let dependencies = [
@@ -295,7 +296,7 @@ final class PackageGeneratorTests: XCTestCase {
         XCTAssertTrue(packageContent.contains(".upToNextMajor(from: \"5.0.0\")"))
         XCTAssertTrue(packageContent.contains(".product(name: \"Alamofire\", package: \"Alamofire\")"))
 
-        // Unresolved dependency should appear as TODO comments
+        // Unresolved dependency should appear as placeholder comments
         XCTAssertTrue(packageContent.contains("// TODO: Convert CocoaPods dependency: SomePod (1.0.0)"))
         XCTAssertTrue(packageContent.contains("// TODO: Add Swift Package equivalent for: SomePod (1.0.0)"))
 

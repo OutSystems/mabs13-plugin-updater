@@ -1,6 +1,7 @@
 import XCTest
 @testable import cdv2spm
 
+// swiftlint:disable:next type_body_length
 final class XMLParserBasicTests: XCTestCase {
     func testParseValidPluginXML() throws {
         let xmlContent = """
@@ -330,7 +331,7 @@ final class XMLParserBasicTests: XCTestCase {
 
     func testParseXMLKeepsUnresolvableVariableSpecUnchanged() throws {
         // If a variable has no matching <preference>, keep the raw "$VAR" value so
-        // the dependency is still created (and gets a useful TODO comment).
+        // the dependency is still created (and gets a placeholder comment).
         let xmlContent = """
         <?xml version="1.0" encoding="UTF-8"?>
         <plugin id="com.example.plugin" version="1.0.0" xmlns="http://apache.org/cordova/ns/plugins/1.0">

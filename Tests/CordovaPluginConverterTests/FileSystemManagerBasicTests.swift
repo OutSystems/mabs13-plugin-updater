@@ -187,7 +187,7 @@ final class FileSystemManagerBasicTests: XCTestCase {
         )
         Foundation.FileManager.default.createFile(
             atPath: xcfwHeadersPath.appendingPathComponent("MyLib.h"),
-            contents: "// MyLib header".data(using: .utf8),
+            contents: Data("// MyLib header".utf8),
             attributes: nil
         )
 
@@ -211,7 +211,7 @@ final class FileSystemManagerBasicTests: XCTestCase {
         )
         Foundation.FileManager.default.createFile(
             atPath: srcIosPath.appendingPathComponent("MyPlugin.h"),
-            contents: "// MyPlugin header".data(using: .utf8),
+            contents: Data("// MyPlugin header".utf8),
             attributes: nil
         )
 

@@ -216,6 +216,10 @@ public class DependencyResolver {
         )
     }
     
+}
+
+// MARK: - HTTP Source Handling
+extension DependencyResolver {
     private func handleHttpSource(
         url: String,
         podSpecInfo: PodSpecInfo,
@@ -249,7 +253,8 @@ public class DependencyResolver {
             // If Git resolution failed but we have an XCFramework, provide that info
             if let vendoredFrameworks = podSpecInfo.vendoredFrameworks,
                vendoredFrameworks.hasSuffix(".xcframework") {
-                logger.debug("Git resolution failed but found XCFramework for \(dependency.name): \(vendoredFrameworks)")
+                let msg = "Git resolution failed but found XCFramework for \(dependency.name): \(vendoredFrameworks)"
+                logger.debug(msg)
                 return ResolvedDependency(
                     originalPod: dependency,
                     spmDependency: nil,

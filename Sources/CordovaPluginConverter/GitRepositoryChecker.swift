@@ -8,22 +8,38 @@ public class GitRepositoryChecker {
 
     // Compiled once at class load time; patterns are literals and never fail.
 
+    private static func makeRegex(
+        _ pattern: String,
+        options: NSRegularExpression.Options = []
+    ) -> NSRegularExpression {
+        do {
+            return try NSRegularExpression(pattern: pattern, options: options)
+        } catch {
+            fatalError("Invalid regex pattern '\(pattern)': \(error)")
+        }
+    }
+
     private static let githubPatterns: [NSRegularExpression] = [
-        try! NSRegularExpression(
-            pattern: #"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$"#,
+        makeRegex(
+            #"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$"#,
             options: .caseInsensitive
         ),
-        // Short "owner/repo" format
-        try! NSRegularExpression(
-            pattern: #"^([^/]+)/([^/]+?)(?:\.git)?/?$"#,
+        makeRegex(
+            #"^([^/]+)/([^/]+?)(?:\.git)?/?$"#,
             options: .caseInsensitive
         )
     ]
 
     /// Matches any host whose name contains "gitlab" (e.g. gitlab.com, gitlab.mycompany.com)
-    private static let gitlabPattern = try! NSRegularExpression(
-        pattern: #"([^:/]*gitlab[^:/]*)[:/](.+?)(?:\.git)?/?$"#
+    private static let gitlabPattern = makeRegex(
+        #"([^:/]*gitlab[^:/]*)[:/](.+?)(?:\.git)?/?$"#
     )
+
+    private struct GitLabComponents {
+        let host: String
+        let encodedPath: String
+        let encodedRef: String
+    }
 
     public init(logger: Logger) {
         self.logger = logger
@@ -117,25 +133,24 @@ public class GitRepositoryChecker {
 
     /// Extracts and percent-encodes the components needed to build any GitLab API URL.
     /// Returns nil when `gitUrl` is not a recognisable GitLab URL.
-    private func gitlabComponents(
-        gitUrl: String,
-        reference: String
-    ) -> (host: String, encodedPath: String, encodedRef: String)? {
+    private func gitlabComponents(gitUrl: String, reference: String) -> GitLabComponents? {
         guard let (host, projectPath) = parseGitLabUrl(gitUrl) else { return nil }
         let encodedPath = projectPath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? projectPath
         let encodedRef = reference.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? reference
-        return (host, encodedPath, encodedRef)
+        return GitLabComponents(host: host, encodedPath: encodedPath, encodedRef: encodedRef)
     }
 
     private func checkGitLabRepository(gitUrl: String, reference: String) async -> Bool? {
-        guard let (host, path, ref) = gitlabComponents(gitUrl: gitUrl, reference: reference) else { return nil }
-        let apiUrl = "https://\(host)/api/v4/projects/\(path)/repository/files/Package.swift?ref=\(ref)"
+        guard let gl = gitlabComponents(gitUrl: gitUrl, reference: reference) else { return nil }
+        let apiUrl = "https://\(gl.host)/api/v4/projects/\(gl.encodedPath)"
+            + "/repository/files/Package.swift?ref=\(gl.encodedRef)"
         return await makeHttpHeadRequest(to: apiUrl)
     }
 
     private func fetchFromGitLab(gitUrl: String, reference: String) async -> String? {
-        guard let (host, path, ref) = gitlabComponents(gitUrl: gitUrl, reference: reference) else { return nil }
-        let apiUrl = "https://\(host)/api/v4/projects/\(path)/repository/files/Package.swift/raw?ref=\(ref)"
+        guard let gl = gitlabComponents(gitUrl: gitUrl, reference: reference) else { return nil }
+        let apiUrl = "https://\(gl.host)/api/v4/projects/\(gl.encodedPath)"
+            + "/repository/files/Package.swift/raw?ref=\(gl.encodedRef)"
         return await fetchFileContent(from: apiUrl)
     }
 
@@ -206,8 +221,10 @@ public class GitRepositoryChecker {
         }
     }
 
-    // MARK: - HTTP Helpers
+}
 
+// MARK: - HTTP Helpers
+extension GitRepositoryChecker {
     private func makeHttpHeadRequest(to urlString: String) async -> Bool {
         guard let url = URL(string: urlString) else { return false }
 

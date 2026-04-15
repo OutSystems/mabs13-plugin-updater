@@ -14,22 +14,52 @@ public class PackageGenerator {
         sourcePath: String = "src/ios",
         fileManager: FileSystemManager? = nil,
         resolvedDependencies: [ResolvedDependency]? = nil
-    )
-        -> String {
+    ) -> String {
         let packageName = metadata.packageName
-        let targetName = packageName
+        let (packageDepsString, targetDepsString) = buildDependencyStrings(
+            from: metadata,
+            resolvedDependencies: resolvedDependencies
+        )
+        let publicHeadersPath = fileManager?.findPublicHeadersPath(in: sourcePath) ?? ""
+        let targetsContent = buildTargetsContent(
+            targetName: packageName,
+            localFrameworks: metadata.localFrameworks,
+            targetDependenciesString: targetDepsString,
+            sourcePath: sourcePath,
+            publicHeadersPath: publicHeadersPath
+        )
+        return """
+        // swift-tools-version:5.9
+        import PackageDescription
 
-        // Build package dependencies
+        let package = Package(
+            name: "\(packageName)",
+            platforms: [.iOS(.v14)],
+            products: [
+                .library(
+                    name: "\(packageName)",
+                    targets: ["\(packageName)"])
+            ],
+            dependencies: [
+        \(packageDepsString)
+            ],
+            targets: [
+        \(targetsContent)
+            ]
+        )
+        """
+    }
+
+    private static func buildDependencyStrings(
+        from metadata: PluginMetadata,
+        resolvedDependencies: [ResolvedDependency]?
+    ) -> (packageDeps: String, targetDeps: String) {
         var packageDependencies = [
             "        .package(url: \"https://github.com/apache/cordova-ios.git\", branch: \"master\")"
         ]
-
-        // Build target dependencies
         var targetDependencies = [
             "                .product(name: \"Cordova\", package: \"cordova-ios\")"
         ]
-
-        // Handle dependencies based on whether we have resolved dependencies
         if let resolvedDeps = resolvedDependencies {
             addResolvedDependencies(
                 resolvedDeps: resolvedDeps,
@@ -43,46 +73,10 @@ public class PackageGenerator {
                 targetDependencies: &targetDependencies
             )
         }
-
-        // Add local xcframework binary targets as target-level dependencies
         for framework in metadata.localFrameworks {
             targetDependencies.append("                .target(name: \"\(framework.name)\")")
         }
-
-        let packageDependenciesString = packageDependencies.joined(separator: ",\n")
-        let targetDependenciesString = targetDependencies.joined(separator: ",\n")
-
-        // Check for header files in the source path (xcframework headers are excluded automatically)
-        let publicHeadersPath = fileManager?.findPublicHeadersPath(in: sourcePath) ?? ""
-
-        let targetsContent = buildTargetsContent(
-            targetName: targetName,
-            localFrameworks: metadata.localFrameworks,
-            targetDependenciesString: targetDependenciesString,
-            sourcePath: sourcePath,
-            publicHeadersPath: publicHeadersPath
-        )
-
-        return """
-        // swift-tools-version:5.9
-        import PackageDescription
-        
-        let package = Package(
-            name: "\(packageName)",
-            platforms: [.iOS(.v14)],
-            products: [
-                .library(
-                    name: "\(targetName)",
-                    targets: ["\(targetName)"])
-            ],
-            dependencies: [
-        \(packageDependenciesString)
-            ],
-            targets: [
-        \(targetsContent)
-            ]
-        )
-        """
+        return (packageDependencies.joined(separator: ",\n"), targetDependencies.joined(separator: ",\n"))
     }
 
     /// Build the content inside `targets: [...]`, including `.binaryTarget` entries

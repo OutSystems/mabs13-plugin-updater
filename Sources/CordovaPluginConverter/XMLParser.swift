@@ -44,79 +44,38 @@ public class XMLParser {
     public static func parsePluginXML(content: String) throws -> PluginMetadata {
         let xml = XMLHash.parse(content)
 
-        // Extract plugin ID
         guard let pluginId = xml["plugin"].element?.attribute(by: "id")?.text else {
             throw XMLParsingError.missingPluginId
         }
 
-        /// Collect Cordova variable preferences (name → default value).
-        /// Plugin-level preferences are a baseline; platform-level ones override them.
-        func collectPreferences(from indexer: XMLIndexer) -> [String: String] {
-            var prefs: [String: String] = [:]
-            for pref in indexer["preference"].all {
-                if let name = pref.element?.attribute(by: "name")?.text,
-                   let defaultValue = pref.element?.attribute(by: "default")?.text {
-                    prefs[name] = defaultValue
-                }
-            }
-            return prefs
-        }
-
         let pluginPreferences = collectPreferences(from: xml["plugin"])
-
-        // Extract pod dependencies from all platforms
         var allDependencies: [PodDependency] = []
         var hasPodspec = false
         var localFrameworks: [LocalXCFramework] = []
 
-        /// Helper to parse pod elements from a podspec node
-        func parsePods(from podspec: XMLIndexer, preferences: [String: String]) {
-            let podElements = podspec["pods"]["pod"].all
-            for podElement in podElements {
-                guard let name = podElement.element?.attribute(by: "name")?.text else { continue }
+        for platform in xml["plugin"]["platform"].all {
+            guard let platformName = platform.element?.attribute(by: "name")?.text,
+                  platformName.lowercased() == "ios" else { continue }
 
-                // Resolve Cordova variable substitution in spec (e.g. "$MY_VERSION" → "1.2.3")
-                let rawSpec = podElement.element?.attribute(by: "spec")?.text
-                let spec = rawSpec.map { resolveVariable($0, using: preferences) }
+            var preferences = pluginPreferences
+            preferences.merge(collectPreferences(from: platform)) { _, new in new }
 
-                let git = podElement.element?.attribute(by: "git")?.text
-                let tag = podElement.element?.attribute(by: "tag")?.text
-                let branch = podElement.element?.attribute(by: "branch")?.text
-                // Require at least spec or git to create a dependency
-                guard spec != nil || git != nil else { continue }
-                let dependency = PodDependency(name: name, spec: spec, git: git, tag: tag, branch: branch)
-                if !allDependencies.contains(dependency) {
-                    allDependencies.append(dependency)
+            if platform["podspec"].element != nil {
+                hasPodspec = true
+                let pods = parsePods(from: platform["podspec"], preferences: preferences)
+                for pod in pods where !allDependencies.contains(pod) {
+                    allDependencies.append(pod)
                 }
             }
-        }
 
-        // Look for podspec sections and xcframeworks only in iOS platform
-        for platform in xml["plugin"]["platform"].all {
-            // Only process iOS platforms
-            if let platformName = platform.element?.attribute(by: "name")?.text,
-               platformName.lowercased() == "ios" {
-                // Merge plugin-level preferences with platform-level ones (platform wins)
-                var preferences = pluginPreferences
-                preferences.merge(collectPreferences(from: platform)) { _, new in new }
-
-                if platform["podspec"].element != nil {
-                    hasPodspec = true
-                    parsePods(from: platform["podspec"], preferences: preferences)
-                }
-
-                // Collect local .xcframework bundles declared with custom="true"
-                for framework in platform["framework"].all {
-                    guard let src = framework.element?.attribute(by: "src")?.text,
-                          src.hasSuffix(".xcframework"),
-                          framework.element?.attribute(by: "custom")?.text == "true"
-                    else { continue }
-                    let name = URL(fileURLWithPath: src).deletingPathExtension().lastPathComponent
-                    let fw = LocalXCFramework(name: name, path: src)
-                    if !localFrameworks.contains(fw) {
-                        localFrameworks.append(fw)
-                    }
-                }
+            for framework in platform["framework"].all {
+                guard let src = framework.element?.attribute(by: "src")?.text,
+                      src.hasSuffix(".xcframework"),
+                      framework.element?.attribute(by: "custom")?.text == "true"
+                else { continue }
+                let name = URL(fileURLWithPath: src).deletingPathExtension().lastPathComponent
+                let fw = LocalXCFramework(name: name, path: src)
+                if !localFrameworks.contains(fw) { localFrameworks.append(fw) }
             }
         }
 
@@ -127,6 +86,35 @@ public class XMLParser {
             originalXmlContent: content,
             localFrameworks: localFrameworks
         )
+    }
+
+    /// Collect Cordova variable preferences (name → default value).
+    private static func collectPreferences(from indexer: XMLIndexer) -> [String: String] {
+        var prefs: [String: String] = [:]
+        for pref in indexer["preference"].all {
+            if let name = pref.element?.attribute(by: "name")?.text,
+               let defaultValue = pref.element?.attribute(by: "default")?.text {
+                prefs[name] = defaultValue
+            }
+        }
+        return prefs
+    }
+
+    /// Parse pod elements from a podspec node, resolving Cordova variable substitutions.
+    private static func parsePods(from podspec: XMLIndexer, preferences: [String: String]) -> [PodDependency] {
+        var dependencies: [PodDependency] = []
+        for podElement in podspec["pods"]["pod"].all {
+            guard let name = podElement.element?.attribute(by: "name")?.text else { continue }
+            let rawSpec = podElement.element?.attribute(by: "spec")?.text
+            let spec = rawSpec.map { resolveVariable($0, using: preferences) }
+            let git = podElement.element?.attribute(by: "git")?.text
+            let tag = podElement.element?.attribute(by: "tag")?.text
+            let branch = podElement.element?.attribute(by: "branch")?.text
+            guard spec != nil || git != nil else { continue }
+            let dependency = PodDependency(name: name, spec: spec, git: git, tag: tag, branch: branch)
+            if !dependencies.contains(dependency) { dependencies.append(dependency) }
+        }
+        return dependencies
     }
 
     /// Resolve a Cordova variable reference in a spec string.
