@@ -78,6 +78,21 @@ public struct PodSpecInfo: Equatable {
     }
 }
 
+// MARK: - Local XCFramework Models
+
+/// Represents a local .xcframework bundle referenced in plugin.xml via <framework custom="true">
+public struct LocalXCFramework: Equatable, Codable {
+    /// Framework module name, e.g. "OSKeyStoreLib"
+    public let name: String
+    /// Path relative to plugin root, e.g. "src/ios/frameworks/OSKeyStoreLib.xcframework"
+    public let path: String
+
+    public init(name: String, path: String) {
+        self.name = name
+        self.path = path
+    }
+}
+
 // MARK: - Swift Package Manager Models
 
 /// Represents different types of SPM dependency requirements
@@ -268,12 +283,21 @@ public struct PluginMetadata: Equatable {
     public let dependencies: [PodDependency]
     public let hasPodspec: Bool
     public let originalXmlContent: String
+    /// Local .xcframework bundles declared with <framework custom="true"> in the iOS platform
+    public let localFrameworks: [LocalXCFramework]
 
-    public init(pluginId: String, dependencies: [PodDependency], hasPodspec: Bool, originalXmlContent: String) {
+    public init(
+        pluginId: String,
+        dependencies: [PodDependency],
+        hasPodspec: Bool,
+        originalXmlContent: String,
+        localFrameworks: [LocalXCFramework] = []
+    ) {
         self.pluginId = pluginId
         self.dependencies = dependencies
         self.hasPodspec = hasPodspec
         self.originalXmlContent = originalXmlContent
+        self.localFrameworks = localFrameworks
     }
 
     /// Package name derived from plugin ID

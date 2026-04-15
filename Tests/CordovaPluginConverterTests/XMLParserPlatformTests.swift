@@ -133,6 +133,60 @@ final class XMLParserPlatformTests: XCTestCase {
         XCTAssertEqual(metadata.dependencies.first?.name, "NamespacePod")
     }
 
+    func testParseXMLWithLocalXCFramework() throws {
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.xcframework" version="1.0.0">
+            <platform name="ios">
+                <source-file src="src/ios/Plugin.swift"/>
+                <framework src="src/ios/frameworks/OSKeyStoreLib.xcframework" embed="true" custom="true" />
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.localFrameworks.count, 1)
+        let fw = try XCTUnwrap(metadata.localFrameworks.first)
+        XCTAssertEqual(fw.name, "OSKeyStoreLib")
+        XCTAssertEqual(fw.path, "src/ios/frameworks/OSKeyStoreLib.xcframework")
+    }
+
+    func testParseXMLIgnoresNonCustomFrameworks() throws {
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.sysframework" version="1.0.0">
+            <platform name="ios">
+                <framework src="Foundation.framework"/>
+                <framework src="UIKit.framework"/>
+                <framework src="src/ios/MyLib.xcframework" embed="true" custom="true" />
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        // Only the custom xcframework should be collected
+        XCTAssertEqual(metadata.localFrameworks.count, 1)
+        XCTAssertEqual(metadata.localFrameworks.first?.name, "MyLib")
+    }
+
+    func testParseXMLDeduplicatesLocalFrameworks() throws {
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.dedup" version="1.0.0">
+            <platform name="ios">
+                <framework src="src/ios/Foo.xcframework" custom="true" />
+                <framework src="src/ios/Foo.xcframework" custom="true" />
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.localFrameworks.count, 1)
+    }
+
     func testParseXMLWithNestedPodspecStructure() throws {
         let xmlContent = """
         <?xml version="1.0" encoding="UTF-8"?>

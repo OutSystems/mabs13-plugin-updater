@@ -44,11 +44,24 @@ public class PackageGenerator {
             )
         }
 
+        // Add local xcframework binary targets as target-level dependencies
+        for framework in metadata.localFrameworks {
+            targetDependencies.append("                .target(name: \"\(framework.name)\")")
+        }
+
         let packageDependenciesString = packageDependencies.joined(separator: ",\n")
         let targetDependenciesString = targetDependencies.joined(separator: ",\n")
 
-        // Check for header files in the source path
+        // Check for header files in the source path (xcframework headers are excluded automatically)
         let publicHeadersPath = fileManager?.findPublicHeadersPath(in: sourcePath) ?? ""
+
+        let targetsContent = buildTargetsContent(
+            targetName: targetName,
+            localFrameworks: metadata.localFrameworks,
+            targetDependenciesString: targetDependenciesString,
+            sourcePath: sourcePath,
+            publicHeadersPath: publicHeadersPath
+        )
 
         return """
         // swift-tools-version:5.9
@@ -66,29 +79,60 @@ public class PackageGenerator {
         \(packageDependenciesString)
             ],
             targets: [
-                .target(
-                    name: "\(targetName)",
-                    dependencies: [
-        \(targetDependenciesString)
-                    ],
-        \(generateTargetPathAndHeaders(sourcePath: sourcePath, publicHeadersPath: publicHeadersPath))
+        \(targetsContent)
             ]
         )
         """
     }
 
-    /// Generate the path and publicHeadersPath parameters for the target
-    /// - Parameters:
-    ///   - sourcePath: The source path for the target
-    ///   - publicHeadersPath: The relative path to headers (empty if no headers)
-    /// - Returns: Formatted string with path and optional publicHeadersPath
-    private static func generateTargetPathAndHeaders(sourcePath: String, publicHeadersPath: String) -> String {
-        if publicHeadersPath.isEmpty {
-            "            path: \"\(sourcePath)\")"
-        } else {
-            "            path: \"\(sourcePath)\",\n" +
-                "            publicHeadersPath: \"\(publicHeadersPath)\")"
+    /// Build the content inside `targets: [...]`, including `.binaryTarget` entries
+    /// for local xcframeworks followed by the main source target.
+    private static func buildTargetsContent(
+        targetName: String,
+        localFrameworks: [LocalXCFramework],
+        targetDependenciesString: String,
+        sourcePath: String,
+        publicHeadersPath: String
+    ) -> String {
+        var result = ""
+
+        for framework in localFrameworks {
+            result += "        .binaryTarget(\n"
+            result += "            name: \"\(framework.name)\",\n"
+            result += "            path: \"\(framework.path)\"\n"
+            result += "        ),\n"
         }
+
+        // Xcframeworks nested inside the source path must be excluded from source
+        // scanning — otherwise SPM warns about "unhandled files" and Xcode can fail
+        // to resolve the module. Paths are relative to the target's own path.
+        let excludePaths: [String] = localFrameworks.compactMap { fw in
+            let prefix = sourcePath + "/"
+            guard fw.path.hasPrefix(prefix) else { return nil }
+            return String(fw.path.dropFirst(prefix.count))
+        }
+
+        result += "        .target(\n"
+        result += "            name: \"\(targetName)\",\n"
+        result += "            dependencies: [\n"
+        result += targetDependenciesString + "\n"
+        result += "            ],\n"
+        result += "            path: \"\(sourcePath)\""
+
+        if !excludePaths.isEmpty {
+            let excludeLines = excludePaths
+                .map { "                \"\($0)\"" }
+                .joined(separator: ",\n")
+            result += ",\n            exclude: [\n\(excludeLines)\n            ]"
+        }
+
+        if !publicHeadersPath.isEmpty {
+            result += ",\n            publicHeadersPath: \"\(publicHeadersPath)\""
+        }
+
+        result += ")"
+
+        return result
     }
 
     /// Add resolved SPM dependencies to package and target dependencies
@@ -106,7 +150,7 @@ public class PackageGenerator {
                 // Add resolved SPM dependency
                 let packageEntry = "        .package(url: \"\(spmDep.url)\", \(spmDep.requirement.description))"
                 packageDependencies.append(packageEntry)
-                
+
                 // Add target dependency
                 let productName = spmDep.productName ?? resolvedDep.originalPod.name
                 let pkgName = spmDep.packageName ?? extractPackageName(from: spmDep.url)
@@ -118,14 +162,14 @@ public class PackageGenerator {
                 let todoPackage = "        // TODO: Convert CocoaPods dependency: " +
                     "\(resolvedDep.originalPod.description) (\(resolvedDep.status.description))"
                 packageDependencies.append(todoPackage)
-                
+
                 let todoTarget = "                // TODO: Add Swift Package equivalent for: " +
                     "\(resolvedDep.originalPod.description)"
                 targetDependencies.append(todoTarget)
             }
         }
     }
-    
+
     /// Add traditional comments for unresolved dependencies
     /// - Parameters:
     ///   - dependencies: Array of CocoaPods dependencies
@@ -142,7 +186,7 @@ public class PackageGenerator {
                 .append("                // TODO: Add Swift Package equivalent for: \(dependency.description)")
         }
     }
-    
+
     /// Extract package name from Git URL for use in target dependencies
     /// - Parameter url: Git repository URL
     /// - Returns: Package name (typically repository name)

@@ -201,6 +201,9 @@ public class FileSystemManager {
 
         var headerFiles: [String] = []
         for case let file as String in enumerator where file.hasSuffix(".h") {
+            // Skip headers that live inside a .xcframework bundle — those belong to a binary
+            // dependency and should not be used as the target's publicHeadersPath.
+            guard !file.contains(".xcframework/") else { continue }
             headerFiles.append(URL(fileURLWithPath: directory).appendingPathComponent(file).path)
         }
 

@@ -176,6 +176,56 @@ final class FileSystemManagerBasicTests: XCTestCase {
         XCTAssertTrue(dirError.errorDescription?.contains("Failed to create directory") == true)
     }
 
+    // MARK: - Header Detection Tests
+
+    func testFindPublicHeadersPathIgnoresXCFrameworkHeaders() throws {
+        // Create a src/ios structure with an xcframework containing .h files
+        let xcfwHeadersPath = tempDirectory
+            .appendingPathComponent("src/ios/frameworks/MyLib.xcframework/ios-arm64/MyLib.framework/Headers")
+        try Foundation.FileManager.default.createDirectory(
+            atPath: xcfwHeadersPath, withIntermediateDirectories: true, attributes: nil
+        )
+        Foundation.FileManager.default.createFile(
+            atPath: xcfwHeadersPath.appendingPathComponent("MyLib.h"),
+            contents: "// MyLib header".data(using: .utf8),
+            attributes: nil
+        )
+
+        // Change CWD so that findPublicHeadersPath resolves "src/ios" inside tempDirectory
+        let originalDir = Foundation.FileManager.default.currentDirectoryPath
+        Foundation.FileManager.default.changeCurrentDirectoryPath(tempDirectory)
+        defer { Foundation.FileManager.default.changeCurrentDirectoryPath(originalDir) }
+
+        let headersPath = fileManager.findPublicHeadersPath(in: "src/ios")
+        XCTAssertTrue(
+            headersPath.isEmpty,
+            "Headers inside .xcframework should be ignored, got: \(headersPath)"
+        )
+    }
+
+    func testFindPublicHeadersPathFindsRegularHeaders() throws {
+        // Create src/ios with a plain .h file (not inside xcframework)
+        let srcIosPath = tempDirectory.appendingPathComponent("src/ios")
+        try Foundation.FileManager.default.createDirectory(
+            atPath: srcIosPath, withIntermediateDirectories: true, attributes: nil
+        )
+        Foundation.FileManager.default.createFile(
+            atPath: srcIosPath.appendingPathComponent("MyPlugin.h"),
+            contents: "// MyPlugin header".data(using: .utf8),
+            attributes: nil
+        )
+
+        let originalDir = Foundation.FileManager.default.currentDirectoryPath
+        Foundation.FileManager.default.changeCurrentDirectoryPath(tempDirectory)
+        defer { Foundation.FileManager.default.changeCurrentDirectoryPath(originalDir) }
+
+        let headersPath = fileManager.findPublicHeadersPath(in: "src/ios")
+        XCTAssertFalse(
+            headersPath.isEmpty,
+            "Regular .h files should be detected"
+        )
+    }
+
     // MARK: - Edge Case and Error Handling Tests
 
     func testCreateBackupIfNeededWithShouldBackupFalse() throws {

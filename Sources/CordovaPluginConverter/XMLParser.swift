@@ -67,6 +67,7 @@ public class XMLParser {
         // Extract pod dependencies from all platforms
         var allDependencies: [PodDependency] = []
         var hasPodspec = false
+        var localFrameworks: [LocalXCFramework] = []
 
         // Helper to parse pod elements from a podspec node
         func parsePods(from podspec: XMLIndexer, preferences: [String: String]) {
@@ -90,7 +91,7 @@ public class XMLParser {
             }
         }
 
-        // Look for podspec sections only in iOS platform
+        // Look for podspec sections and xcframeworks only in iOS platform
         for platform in xml["plugin"]["platform"].all {
             // Only process iOS platforms
             if let platformName = platform.element?.attribute(by: "name")?.text,
@@ -103,6 +104,19 @@ public class XMLParser {
                     hasPodspec = true
                     parsePods(from: platform["podspec"], preferences: preferences)
                 }
+
+                // Collect local .xcframework bundles declared with custom="true"
+                for framework in platform["framework"].all {
+                    guard let src = framework.element?.attribute(by: "src")?.text,
+                          src.hasSuffix(".xcframework"),
+                          framework.element?.attribute(by: "custom")?.text == "true"
+                    else { continue }
+                    let name = URL(fileURLWithPath: src).deletingPathExtension().lastPathComponent
+                    let fw = LocalXCFramework(name: name, path: src)
+                    if !localFrameworks.contains(fw) {
+                        localFrameworks.append(fw)
+                    }
+                }
             }
         }
 
@@ -110,7 +124,8 @@ public class XMLParser {
             pluginId: pluginId,
             dependencies: allDependencies,
             hasPodspec: hasPodspec,
-            originalXmlContent: content
+            originalXmlContent: content,
+            localFrameworks: localFrameworks
         )
     }
 

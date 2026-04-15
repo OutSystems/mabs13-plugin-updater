@@ -194,6 +194,68 @@ final class PackageGeneratorTests: XCTestCase {
         XCTAssertTrue(packageContent.contains("path: \"src/ios\""))
     }
 
+    func testGeneratePackageSwiftWithLocalXCFramework() {
+        let framework = LocalXCFramework(
+            name: "OSKeyStoreLib",
+            path: "src/ios/frameworks/OSKeyStoreLib.xcframework"
+        )
+        let metadata = PluginMetadata(
+            pluginId: "com.example.xcframework",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            localFrameworks: [framework]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        // Should contain a binaryTarget for the xcframework
+        XCTAssertTrue(packageContent.contains(".binaryTarget("))
+        XCTAssertTrue(packageContent.contains("name: \"OSKeyStoreLib\""))
+        XCTAssertTrue(packageContent.contains("path: \"src/ios/frameworks/OSKeyStoreLib.xcframework\""))
+
+        // Main target should reference the binary target
+        XCTAssertTrue(packageContent.contains(".target(name: \"OSKeyStoreLib\")"))
+
+        // The xcframework lives inside src/ios, so it must be excluded from source scanning
+        XCTAssertTrue(packageContent.contains("exclude: ["))
+        XCTAssertTrue(packageContent.contains("\"frameworks/OSKeyStoreLib.xcframework\""))
+
+        // Should NOT contain publicHeadersPath (xcframework headers are internal to the binary)
+        XCTAssertFalse(packageContent.contains("publicHeadersPath"))
+    }
+
+    func testGeneratePackageSwiftWithMultipleLocalXCFrameworks() {
+        let frameworks = [
+            LocalXCFramework(name: "LibA", path: "src/ios/LibA.xcframework"),
+            LocalXCFramework(name: "LibB", path: "src/ios/LibB.xcframework")
+        ]
+        let metadata = PluginMetadata(
+            pluginId: "com.example.multifw",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            localFrameworks: frameworks
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains("name: \"LibA\""))
+        XCTAssertTrue(packageContent.contains("name: \"LibB\""))
+        XCTAssertTrue(packageContent.contains(".target(name: \"LibA\")"))
+        XCTAssertTrue(packageContent.contains(".target(name: \"LibB\")"))
+
+        // Both binaryTarget declarations should precede the main .target()
+        let binaryARange = packageContent.range(of: "name: \"LibA\"")
+        let mainTargetRange = packageContent.range(of: ".target(\n            name: \"com.example.multifw\"")
+        XCTAssertNotNil(binaryARange)
+        XCTAssertNotNil(mainTargetRange)
+        if let binA = binaryARange, let main = mainTargetRange {
+            XCTAssertTrue(binA.lowerBound < main.lowerBound,
+                          "binaryTarget for LibA should appear before the main .target()")
+        }
+    }
+
     func testGeneratePackageSwiftWithResolvedDependencies() {
         let pod = PodDependency(name: "Alamofire", spec: "~> 5.0")
         let unresolvedPod = PodDependency(name: "SomePod", spec: "1.0.0")
