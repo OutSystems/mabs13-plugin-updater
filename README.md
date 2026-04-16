@@ -55,13 +55,11 @@ The tool also:
 
 ## Installation
 
-### Download binary (recommended)
-
-Download the latest universal macOS binary from the [releases page](https://github.com/andredestro/cordova-plugin-converter/releases), then:
+### Homebrew (recommended)
 
 ```bash
-unzip cdv2spm-v*-macos.zip
-sudo mv cdv2spm /usr/local/bin/
+brew tap andredestro/tap
+brew install cdv2spm
 ```
 
 ### Build from source
