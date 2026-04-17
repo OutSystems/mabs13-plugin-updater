@@ -304,6 +304,42 @@ final class PackageGeneratorTests: XCTestCase {
         XCTAssertTrue(packageContent.contains("cordova-ios.git"))
         XCTAssertTrue(packageContent.contains(".product(name: \"Cordova\", package: \"cordova-ios\")"))
     }
+
+    func testGeneratePackageSwiftWithFirebaseLikeResolvedDependency() {
+        // firebase-ios-sdk Package.swift declares name: "Firebase", but SPM identifies it
+        // by the URL-derived identity "firebase-ios-sdk". The pod name "FirebaseMessaging"
+        // must match the product name, not the first product "Firebase".
+        let pod = PodDependency(name: "FirebaseMessaging", spec: "10.29.0")
+
+        let resolvedDeps: [ResolvedDependency] = [
+            ResolvedDependency(
+                originalPod: pod,
+                spmDependency: SPMDependency(
+                    url: "https://github.com/firebase/firebase-ios-sdk.git",
+                    requirement: .exact("10.29.0"),
+                    productName: "FirebaseMessaging",
+                    packageName: "firebase-ios-sdk"
+                ),
+                status: .resolved
+            )
+        ]
+
+        let metadata = PluginMetadata(
+            pluginId: "com.example.fcm",
+            dependencies: [pod],
+            hasPodspec: true,
+            originalXmlContent: ""
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(
+            from: metadata,
+            resolvedDependencies: resolvedDeps
+        )
+
+        XCTAssertTrue(packageContent.contains("https://github.com/firebase/firebase-ios-sdk.git"))
+        XCTAssertTrue(packageContent.contains(".product(name: \"FirebaseMessaging\", package: \"firebase-ios-sdk\")"))
+        XCTAssertFalse(packageContent.contains(".product(name: \"Firebase\", package: \"Firebase\")"))
+    }
 }
 
 /// Mock FileSystemManager for testing

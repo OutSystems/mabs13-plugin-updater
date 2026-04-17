@@ -11,6 +11,32 @@ final class SPMPackageParserTests: XCTestCase {
         parser = SPMPackageParser(logger: logger)
     }
     
+    func testParseMultipleLibraryProducts() {
+        let firebaseLikePackage = """
+        // swift-tools-version:5.9
+        import PackageDescription
+
+        let package = Package(
+            name: "Firebase",
+            products: [
+                .library(name: "Firebase", targets: ["Firebase"]),
+                .library(name: "FirebaseMessaging", targets: ["FirebaseMessaging"]),
+                .library(name: "FirebaseAuth", targets: ["FirebaseAuth"])
+            ],
+            targets: []
+        )
+        """
+
+        let parsed = parser.parsePackageSwift(firebaseLikePackage)
+
+        XCTAssertNotNil(parsed)
+        XCTAssertEqual(parsed?.name, "Firebase")
+        let productNames = parsed?.products.map { $0.name } ?? []
+        XCTAssertTrue(productNames.contains("Firebase"))
+        XCTAssertTrue(productNames.contains("FirebaseMessaging"))
+        XCTAssertTrue(productNames.contains("FirebaseAuth"))
+    }
+
     func testIsLibraryPackage() {
         let libraryPackage = """
         products: [

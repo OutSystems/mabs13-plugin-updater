@@ -157,7 +157,9 @@ public class SPMPackageParser {
     // MARK: - Helper Methods
     
     private func extractSection(from content: String, sectionName: String) -> String? {
-        let pattern = #"\#(sectionName):\s*\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]"#
+        // [^\[\]]* excludes both [ and ] so nested arrays like targets: ["Foo"] are not swallowed
+        // before (?:\[[^\]]*\]) can match them.
+        let pattern = #"\#(sectionName):\s*\[([^\[\]]*(?:\[[^\]]*\][^\[\]]*)*)\]"#
         return extractFirstCaptureGroup(from: content, pattern: pattern)
     }
     

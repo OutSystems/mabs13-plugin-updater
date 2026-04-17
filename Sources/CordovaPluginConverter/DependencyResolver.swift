@@ -199,14 +199,24 @@ public class DependencyResolver {
             sourceTag: tag
         )
         
-        // Use the parsed package info to get the main library name and the declared package name
-        let productName = packageInfo.products.first(where: { $0.type == .library })?.name ?? packageInfo.name
+        // Prefer a product whose name matches the pod name (e.g. FirebaseMessaging inside firebase-ios-sdk),
+        // falling back to the first library product, then the package name.
+        let podName = dependency.name
+        let productName = packageInfo.products.first(where: { $0.type == .library && $0.name == podName })?.name
+            ?? packageInfo.products.first(where: { $0.type == .library })?.name
+            ?? packageInfo.name
+
+        // SPM identifies URL-based packages by the last URL path component (without .git),
+        // not by the name: field declared inside Package.swift (e.g. "Firebase" vs "firebase-ios-sdk").
+        let packageName = url.components(separatedBy: "/").last
+            .map { $0.hasSuffix(".git") ? String($0.dropLast(4)) : $0 }
+            ?? packageInfo.name
 
         let spmDependency = SPMDependency(
             url: url,
             requirement: requirement,
             productName: productName,
-            packageName: packageInfo.name
+            packageName: packageName
         )
         
         return ResolvedDependency(
