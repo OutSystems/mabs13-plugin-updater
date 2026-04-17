@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-17
+
+### Added
+
+- Native Obj-C/C source file support: `<source-file compiler-flags="...">` entries are now parsed
+  and emitted as SPM `cSettings` (`.define`, `.defineWithValue`, `.headerSearchPath`)
+- System framework linking: `<framework src="Security.framework"/>` generates `linkerSettings`
+  with `.linkedFramework("Security")` in the target
+- Header file support: `<header-file>` paths are parsed and used to derive `publicHeadersPath`
+  and additional `.headerSearchPath` cSettings entries
+- Multi-directory source layout: when native sources span multiple directories (e.g. `src/ios`
+  and `src/common`), the common ancestor is used as `path:` and explicit `sources:` are listed
+- `CompilerFlagsParser` utility to convert raw `-D` compiler flag strings into typed
+  `CCompilerSetting` values, with deduplication across multiple source files
+- 47 new unit tests covering compiler flag parsing, native source layout, system framework
+  parsing, header file handling, and end-to-end SQLCipher-like plugin scenarios
+
+### Fixed
+
+- Hybrid plugins (both CocoaPods dependencies and native source files) now display both sections
+  in the conversion summary instead of only showing the CocoaPods section
+- `isNativeOnly` now correctly reflects plugins with no real pod dependencies even when the
+  `<podspec>` element is present but contains no `<pod>` children
+- Duplicate native source files with different compiler flags no longer create duplicate entries
+  in the `sources:` list; deduplication is based on file path only
+
 ## [1.0.1] - 2026-04-17
 
 ### Fixed

@@ -52,6 +52,9 @@ public class XMLParser {
         var allDependencies: [PodDependency] = []
         var hasPodspec = false
         var localFrameworks: [LocalXCFramework] = []
+        var nativeSources: [NativeSourceFile] = []
+        var systemFrameworks: [SystemFramework] = []
+        var headerPaths: [String] = []
 
         for platform in xml["plugin"]["platform"].all {
             guard let platformName = platform.element?.attribute(by: "name")?.text,
@@ -68,15 +71,16 @@ public class XMLParser {
                 }
             }
 
-            for framework in platform["framework"].all {
-                guard let src = framework.element?.attribute(by: "src")?.text,
-                      src.hasSuffix(".xcframework"),
-                      framework.element?.attribute(by: "custom")?.text == "true"
-                else { continue }
-                let name = URL(fileURLWithPath: src).deletingPathExtension().lastPathComponent
-                let fw = LocalXCFramework(name: name, path: src)
-                if !localFrameworks.contains(fw) { localFrameworks.append(fw) }
+            let newSources = parseNativeSources(from: platform)
+            for source in newSources where !nativeSources.contains(where: { $0.path == source.path }) {
+                nativeSources.append(source)
             }
+            for path in parseHeaderPaths(from: platform) where !headerPaths.contains(path) {
+                headerPaths.append(path)
+            }
+            let (local, system) = parseFrameworks(from: platform)
+            for fw in local where !localFrameworks.contains(fw) { localFrameworks.append(fw) }
+            for fw in system where !systemFrameworks.contains(fw) { systemFrameworks.append(fw) }
         }
 
         return PluginMetadata(
@@ -84,7 +88,10 @@ public class XMLParser {
             dependencies: allDependencies,
             hasPodspec: hasPodspec,
             originalXmlContent: content,
-            localFrameworks: localFrameworks
+            localFrameworks: localFrameworks,
+            nativeSources: nativeSources,
+            systemFrameworks: systemFrameworks,
+            headerPaths: headerPaths
         )
     }
 
@@ -124,6 +131,41 @@ public class XMLParser {
         guard value.hasPrefix("$") else { return value }
         let varName = String(value.dropFirst())
         return preferences[varName] ?? value
+    }
+
+    private static func parseNativeSources(from platform: XMLIndexer) -> [NativeSourceFile] {
+        platform["source-file"].all.compactMap { element in
+            guard let src = element.element?.attribute(by: "src")?.text else { return nil }
+            let flags = element.element?.attribute(by: "compiler-flags")?.text ?? ""
+            return NativeSourceFile(path: src, rawCompilerFlags: flags)
+        }
+    }
+
+    private static func parseHeaderPaths(from platform: XMLIndexer) -> [String] {
+        platform["header-file"].all.compactMap { $0.element?.attribute(by: "src")?.text }
+    }
+
+    private static func parseFrameworks(
+        from platform: XMLIndexer
+    ) -> (local: [LocalXCFramework], system: [SystemFramework]) {
+        var local: [LocalXCFramework] = []
+        var system: [SystemFramework] = []
+        for framework in platform["framework"].all {
+            guard let src = framework.element?.attribute(by: "src")?.text else { continue }
+            let isCustom = framework.element?.attribute(by: "custom")?.text == "true"
+            let fwType = framework.element?.attribute(by: "type")?.text ?? ""
+            if src.hasSuffix(".xcframework"), isCustom {
+                let name = URL(fileURLWithPath: src).deletingPathExtension().lastPathComponent
+                local.append(LocalXCFramework(name: name, path: src))
+                continue
+            }
+            guard !isCustom,
+                  fwType != "gradleReference", fwType != "projectReference",
+                  !src.contains(":") else { continue }
+            let name = src.hasSuffix(".framework") ? String(src.dropLast(".framework".count)) : src
+            system.append(SystemFramework(name: name))
+        }
+        return (local, system)
     }
 
     /// Generate updated plugin.xml content with iOS platform package attribute

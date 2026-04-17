@@ -97,8 +97,21 @@ extension CordovaToSPMConverter {
             for dependency in metadata.dependencyDescriptions {
                 logger.info("  - \(dependency)")
             }
-        } else {
-            logger.warn("No CocoaPods dependencies found")
+        }
+
+        if metadata.hasNativeSources {
+            logger.info("Found \(metadata.nativeSources.count) native source file(s):")
+            for source in metadata.nativeSources {
+                logger.info("  - \(source.path)")
+            }
+        }
+
+        if !metadata.hasDependencies && !metadata.hasNativeSources {
+            logger.warn("No CocoaPods dependencies or native source files found")
+        }
+
+        if !metadata.systemFrameworks.isEmpty {
+            logger.info("System framework(s): \(metadata.systemFrameworks.map(\.name).joined(separator: ", "))")
         }
     }
 
@@ -289,7 +302,13 @@ extension CordovaToSPMConverter {
                 Tip: Use --auto-resolve flag to attempt automatic conversion.
                 """)
             }
-        } else {
+        }
+
+        if metadata.hasNativeSources {
+            logger.success("Native source files and compiler flags configured automatically.")
+        }
+
+        if !metadata.hasDependencies && !metadata.hasNativeSources {
             logger.success("Conversion completed! Your Package.swift is ready to use.")
         }
     }

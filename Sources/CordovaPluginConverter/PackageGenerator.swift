@@ -5,8 +5,8 @@ public class PackageGenerator {
     /// Generate Package.swift content based on plugin metadata
     /// - Parameters:
     ///   - metadata: Plugin metadata containing dependencies
-    ///   - sourcePath: Path to check for header files (defaults to "src/ios")
-    ///   - fileManager: FileSystemManager for header detection (optional)
+    ///   - sourcePath: Fallback path when no native sources are declared (defaults to "src/ios")
+    ///   - fileManager: FileSystemManager for filesystem-based header detection (fallback)
     ///   - resolvedDependencies: Optional array of resolved dependencies (for auto-resolution)
     /// - Returns: Complete Package.swift content as string
     public static func generatePackageSwift(
@@ -20,13 +20,30 @@ public class PackageGenerator {
             from: metadata,
             resolvedDependencies: resolvedDependencies
         )
-        let publicHeadersPath = fileManager?.findPublicHeadersPath(in: sourcePath) ?? ""
+
+        // Compute source layout from native sources when available
+        let layout = computeNativeSourceLayout(from: metadata, defaultSourcePath: sourcePath)
+
+        // Determine publicHeadersPath: prefer metadata-derived value, fallback to filesystem scan
+        let metadataHeadersPath = computePublicHeadersPath(
+            from: metadata.headerPaths,
+            targetPath: layout.path
+        )
+        let publicHeadersPath = metadataHeadersPath.isEmpty
+            ? (fileManager?.findPublicHeadersPath(in: layout.path) ?? "")
+            : metadataHeadersPath
+
+        let linkerSettings = metadata.systemFrameworks.map { LinkerSetting.linkedFramework($0.name) }
+
         let targetsContent = buildTargetsContent(
             targetName: packageName,
             localFrameworks: metadata.localFrameworks,
             targetDependenciesString: targetDepsString,
-            sourcePath: sourcePath,
-            publicHeadersPath: publicHeadersPath
+            sourcePath: layout.path,
+            publicHeadersPath: publicHeadersPath,
+            explicitSources: layout.sources,
+            cSettings: layout.cSettings,
+            linkerSettings: linkerSettings
         )
         return """
         // swift-tools-version:5.9
@@ -86,7 +103,10 @@ public class PackageGenerator {
         localFrameworks: [LocalXCFramework],
         targetDependenciesString: String,
         sourcePath: String,
-        publicHeadersPath: String
+        publicHeadersPath: String,
+        explicitSources: [String] = [],
+        cSettings: [CCompilerSetting] = [],
+        linkerSettings: [LinkerSetting] = []
     ) -> String {
         var result = ""
 
@@ -97,14 +117,16 @@ public class PackageGenerator {
             result += "        ),\n"
         }
 
-        // Xcframeworks nested inside the source path must be excluded from source
-        // scanning — otherwise SPM warns about "unhandled files" and Xcode can fail
-        // to resolve the module. Paths are relative to the target's own path.
-        let excludePaths: [String] = localFrameworks.compactMap { fw in
-            let prefix = sourcePath + "/"
-            guard fw.path.hasPrefix(prefix) else { return nil }
-            return String(fw.path.dropFirst(prefix.count))
-        }
+        // When explicit sources are provided (multi-dir case) xcframeworks are not included
+        // in explicitSources, so no exclude: block is needed. In the single-dir case use
+        // the existing exclude mechanism for xcframeworks nested inside the source path.
+        let excludePaths: [String] = explicitSources.isEmpty
+            ? localFrameworks.compactMap { fw in
+                let prefix = sourcePath + "/"
+                guard fw.path.hasPrefix(prefix) else { return nil }
+                return String(fw.path.dropFirst(prefix.count))
+            }
+            : []
 
         result += "        .target(\n"
         result += "            name: \"\(targetName)\",\n"
@@ -112,6 +134,13 @@ public class PackageGenerator {
         result += targetDependenciesString + "\n"
         result += "            ],\n"
         result += "            path: \"\(sourcePath)\""
+
+        if !explicitSources.isEmpty {
+            let sourcesLines = explicitSources
+                .map { "                \"\($0)\"" }
+                .joined(separator: ",\n")
+            result += ",\n            sources: [\n\(sourcesLines)\n            ]"
+        }
 
         if !excludePaths.isEmpty {
             let excludeLines = excludePaths
@@ -122,6 +151,20 @@ public class PackageGenerator {
 
         if !publicHeadersPath.isEmpty {
             result += ",\n            publicHeadersPath: \"\(publicHeadersPath)\""
+        }
+
+        if !cSettings.isEmpty {
+            let settingsLines = cSettings
+                .map { "                \($0.spmCode)" }
+                .joined(separator: ",\n")
+            result += ",\n            cSettings: [\n\(settingsLines)\n            ]"
+        }
+
+        if !linkerSettings.isEmpty {
+            let linkerLines = linkerSettings
+                .map { "                \($0.spmCode)" }
+                .joined(separator: ",\n")
+            result += ",\n            linkerSettings: [\n\(linkerLines)\n            ]"
         }
 
         result += ")"
@@ -195,6 +238,8 @@ public class PackageGenerator {
         }
         return "UnknownPackage"
     }
+
+    // MARK: - Native Source Layout Helpers
 
     /// Check that generated Package.swift contains all required top-level elements.
     /// This is a structural presence check, not a Swift syntax validator.

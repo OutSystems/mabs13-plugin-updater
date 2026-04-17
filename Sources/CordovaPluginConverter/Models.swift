@@ -78,6 +78,68 @@ public struct PodSpecInfo: Equatable {
     }
 }
 
+// MARK: - Native Source Models
+
+/// A C compiler setting for an SPM target's cSettings block
+public enum CCompilerSetting: Equatable, Hashable {
+    case define(String)
+    case defineWithValue(String, String)
+    case headerSearchPath(String)
+
+    public var spmCode: String {
+        switch self {
+        case let .define(key):
+            return ".define(\"\(key)\")"
+        case let .defineWithValue(key, value):
+            return ".define(\"\(key)\", to: \"\(value)\")"
+        case let .headerSearchPath(path):
+            return ".headerSearchPath(\"\(path)\")"
+        }
+    }
+}
+
+/// A linker setting for an SPM target's linkerSettings block
+public enum LinkerSetting: Equatable {
+    case linkedFramework(String)
+    case linkedLibrary(String)
+
+    public var spmCode: String {
+        switch self {
+        case let .linkedFramework(name):
+            return ".linkedFramework(\"\(name)\")"
+        case let .linkedLibrary(name):
+            return ".linkedLibrary(\"\(name)\")"
+        }
+    }
+}
+
+/// A native source file declared via <source-file> in the iOS platform block
+public struct NativeSourceFile: Equatable {
+    /// Path relative to plugin root, e.g. "src/ios/SQLitePlugin.m"
+    public let path: String
+    /// Raw compiler-flags attribute value, e.g. "-DSQLITE_HAS_CODEC -DHAVE_USLEEP=1"
+    public let rawCompilerFlags: String
+
+    public init(path: String, rawCompilerFlags: String = "") {
+        self.path = path
+        self.rawCompilerFlags = rawCompilerFlags.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The directory containing this source file, e.g. "src/ios"
+    public var directory: String {
+        (path as NSString).deletingLastPathComponent
+    }
+}
+
+/// A system framework declared via <framework src="X.framework"/> in the iOS platform block
+public struct SystemFramework: Equatable {
+    public let name: String
+
+    public init(name: String) {
+        self.name = name
+    }
+}
+
 // MARK: - Local XCFramework Models
 
 /// Represents a local .xcframework bundle referenced in plugin.xml via <framework custom="true">
@@ -285,19 +347,31 @@ public struct PluginMetadata: Equatable {
     public let originalXmlContent: String
     /// Local .xcframework bundles declared with <framework custom="true"> in the iOS platform
     public let localFrameworks: [LocalXCFramework]
+    /// Native source files declared via <source-file> in the iOS platform
+    public let nativeSources: [NativeSourceFile]
+    /// System frameworks declared via <framework src="X.framework"/> in the iOS platform
+    public let systemFrameworks: [SystemFramework]
+    /// Header file paths declared via <header-file> in the iOS platform
+    public let headerPaths: [String]
 
     public init(
         pluginId: String,
         dependencies: [PodDependency],
         hasPodspec: Bool,
         originalXmlContent: String,
-        localFrameworks: [LocalXCFramework] = []
+        localFrameworks: [LocalXCFramework] = [],
+        nativeSources: [NativeSourceFile] = [],
+        systemFrameworks: [SystemFramework] = [],
+        headerPaths: [String] = []
     ) {
         self.pluginId = pluginId
         self.dependencies = dependencies
         self.hasPodspec = hasPodspec
         self.originalXmlContent = originalXmlContent
         self.localFrameworks = localFrameworks
+        self.nativeSources = nativeSources
+        self.systemFrameworks = systemFrameworks
+        self.headerPaths = headerPaths
     }
 
     /// Package name derived from plugin ID
@@ -308,6 +382,16 @@ public struct PluginMetadata: Equatable {
     /// Whether this plugin has any CocoaPods dependencies
     public var hasDependencies: Bool {
         !dependencies.isEmpty
+    }
+
+    /// Whether this plugin has native source files (Obj-C/C) but no CocoaPods
+    public var isNativeOnly: Bool {
+        !hasDependencies && !nativeSources.isEmpty
+    }
+
+    /// Whether this plugin has any native source files declared
+    public var hasNativeSources: Bool {
+        !nativeSources.isEmpty
     }
 
     /// Dependency descriptions for logging

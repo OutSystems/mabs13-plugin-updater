@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import XCTest
 @testable import cdv2spm
 
@@ -339,6 +340,199 @@ final class PackageGeneratorTests: XCTestCase {
         XCTAssertTrue(packageContent.contains("https://github.com/firebase/firebase-ios-sdk.git"))
         XCTAssertTrue(packageContent.contains(".product(name: \"FirebaseMessaging\", package: \"firebase-ios-sdk\")"))
         XCTAssertFalse(packageContent.contains(".product(name: \"Firebase\", package: \"Firebase\")"))
+    }
+
+    // MARK: - cSettings generation
+
+    func testGeneratePackageSwiftWithSingleDirNativeSources() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.native",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [
+                NativeSourceFile(path: "src/ios/Plugin.m", rawCompilerFlags: "-DFOO -DBAR=1")
+            ]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains("path: \"src/ios\""))
+        XCTAssertTrue(packageContent.contains("cSettings: ["))
+        XCTAssertTrue(packageContent.contains(".define(\"FOO\")"))
+        XCTAssertTrue(packageContent.contains(".define(\"BAR\", to: \"1\")"))
+        XCTAssertFalse(packageContent.contains("sources: ["))
+    }
+
+    func testGeneratePackageSwiftWithMultiDirNativeSources() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.multidir",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [
+                NativeSourceFile(path: "src/ios/Plugin.m", rawCompilerFlags: "-DFOO"),
+                NativeSourceFile(path: "src/common/lib.c", rawCompilerFlags: "-DFOO -DBAR=1")
+            ],
+            headerPaths: ["src/ios/Plugin.h", "src/common/lib.h"]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        // Target path should be the common ancestor
+        XCTAssertTrue(packageContent.contains("path: \"src\""))
+        // Explicit sources list required
+        XCTAssertTrue(packageContent.contains("sources: ["))
+        XCTAssertTrue(packageContent.contains("\"ios/Plugin.m\""))
+        XCTAssertTrue(packageContent.contains("\"common/lib.c\""))
+        // publicHeadersPath derived from first header
+        XCTAssertTrue(packageContent.contains("publicHeadersPath: \"ios\""))
+        // Additional header dir as headerSearchPath
+        XCTAssertTrue(packageContent.contains(".headerSearchPath(\"common\")"))
+        // Deduped defines
+        XCTAssertTrue(packageContent.contains(".define(\"FOO\")"))
+        XCTAssertTrue(packageContent.contains(".define(\"BAR\", to: \"1\")"))
+        // -w flag must NOT produce an entry
+        XCTAssertFalse(packageContent.contains(".define(\"w\")"))
+    }
+
+    func testGeneratePackageSwiftWithLinkerSettings() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.frameworks",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [NativeSourceFile(path: "src/ios/Plugin.m")],
+            systemFrameworks: [SystemFramework(name: "Security")]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains("linkerSettings: ["))
+        XCTAssertTrue(packageContent.contains(".linkedFramework(\"Security\")"))
+    }
+
+    func testGeneratePackageSwiftMultipleLinkerSettings() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.multifw",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [NativeSourceFile(path: "src/ios/Plugin.m")],
+            systemFrameworks: [SystemFramework(name: "Security"), SystemFramework(name: "CoreLocation")]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains(".linkedFramework(\"Security\")"))
+        XCTAssertTrue(packageContent.contains(".linkedFramework(\"CoreLocation\")"))
+    }
+
+    func testGeneratePackageSwiftNoLinkerSettingsWhenNoSystemFrameworks() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.nofw",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: ""
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertFalse(packageContent.contains("linkerSettings:"))
+    }
+
+    func testGeneratePackageSwiftSQLCipherLike() {
+        // Reproduces the cordova-sqlcipher-adapter scenario end-to-end
+        let metadata = PluginMetadata(
+            pluginId: "cordova-sqlcipher-adapter",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [
+                NativeSourceFile(path: "src/ios/SQLitePlugin.m", rawCompilerFlags: "-DSQLITE_HAS_CODEC"),
+                NativeSourceFile(path: "src/ios/Helper.m", rawCompilerFlags: "-w"),
+                NativeSourceFile(
+                    path: "src/common/sqlite3.c",
+                    rawCompilerFlags: "-DSQLITE_HAS_CODEC -DHAVE_USLEEP=1 -DSQLITE_TEMP_STORE=3"
+                )
+            ],
+            systemFrameworks: [SystemFramework(name: "Security")],
+            headerPaths: ["src/ios/SQLitePlugin.h", "src/common/sqlite3.h"]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        // Multi-dir → common ancestor path
+        XCTAssertTrue(packageContent.contains("path: \"src\""))
+        // Explicit sources
+        XCTAssertTrue(packageContent.contains("\"ios/SQLitePlugin.m\""))
+        XCTAssertTrue(packageContent.contains("\"ios/Helper.m\""))
+        XCTAssertTrue(packageContent.contains("\"common/sqlite3.c\""))
+        // publicHeadersPath from first header (src/ios/)
+        XCTAssertTrue(packageContent.contains("publicHeadersPath: \"ios\""))
+        // headerSearchPath for src/common/
+        XCTAssertTrue(packageContent.contains(".headerSearchPath(\"common\")"))
+        // Deduplicated defines (SQLITE_HAS_CODEC appears in two source files)
+        let occurrences = packageContent.components(separatedBy: ".define(\"SQLITE_HAS_CODEC\")").count - 1
+        XCTAssertEqual(occurrences, 1, "SQLITE_HAS_CODEC must appear exactly once after deduplication")
+        XCTAssertTrue(packageContent.contains(".define(\"HAVE_USLEEP\", to: \"1\")"))
+        XCTAssertTrue(packageContent.contains(".define(\"SQLITE_TEMP_STORE\", to: \"3\")"))
+        // linkerSettings
+        XCTAssertTrue(packageContent.contains(".linkedFramework(\"Security\")"))
+        // -w must not produce an entry
+        XCTAssertFalse(packageContent.contains(".define(\"w\")"))
+    }
+
+    // MARK: - PackageGenerator layout helpers
+
+    func testCommonAncestorPathTwoDirs() {
+        let result = PackageGenerator.commonAncestorPath(of: ["src/ios", "src/common"])
+        XCTAssertEqual(result, "src")
+    }
+
+    func testCommonAncestorPathSingleDir() {
+        let result = PackageGenerator.commonAncestorPath(of: ["src/ios"])
+        XCTAssertEqual(result, "src/ios")
+    }
+
+    func testCommonAncestorPathDeepCommon() {
+        let result = PackageGenerator.commonAncestorPath(of: ["a/b/c", "a/b/d"])
+        XCTAssertEqual(result, "a/b")
+    }
+
+    func testCommonAncestorPathNoCommon() {
+        let result = PackageGenerator.commonAncestorPath(of: ["ios", "android"])
+        XCTAssertEqual(result, ".")
+    }
+
+    func testRelativePath() {
+        XCTAssertEqual(PackageGenerator.relativePath("src/ios/Plugin.m", to: "src"), "ios/Plugin.m")
+        XCTAssertEqual(PackageGenerator.relativePath("src/common/lib.c", to: "src"), "common/lib.c")
+    }
+
+    func testComputePublicHeadersPathFirstHeaderInSubdir() {
+        let result = PackageGenerator.computePublicHeadersPath(
+            from: ["src/ios/Plugin.h", "src/common/sqlite3.h"],
+            targetPath: "src"
+        )
+        XCTAssertEqual(result, "ios")
+    }
+
+    func testComputePublicHeadersPathHeaderInSameDir() {
+        let result = PackageGenerator.computePublicHeadersPath(
+            from: ["src/ios/Plugin.h"],
+            targetPath: "src/ios"
+        )
+        XCTAssertEqual(result, ".")
+    }
+
+    func testComputeHeaderSearchPathsExcludesPublicDir() {
+        let result = PackageGenerator.computeHeaderSearchPaths(
+            headerPaths: ["src/ios/Plugin.h", "src/common/sqlite3.h"],
+            targetPath: "src",
+            excludingDir: "ios"
+        )
+        XCTAssertEqual(result, ["common"])
     }
 }
 
