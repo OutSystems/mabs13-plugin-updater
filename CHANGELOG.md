@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-04-17
+
+### Fixed
+
+- Multi-product SPM packages (e.g. `firebase-ios-sdk`) now resolve to the correct product name
+  matching the CocoaPod name (e.g. `FirebaseMessaging`) instead of always picking the first
+  product listed in the remote `Package.swift` (e.g. `Firebase`)
+- Package identifier in `.product(name:package:)` is now derived from the repository URL
+  (e.g. `firebase-ios-sdk`) instead of the `name:` field declared inside `Package.swift`
+  (e.g. `Firebase`), matching how SPM identifies URL-based packages
+- `SPMPackageParser` failed to extract any products from `Package.swift` files that declare
+  multiple library products; the section regex incorrectly consumed opening brackets of nested
+  arrays (e.g. `targets: ["Foo"]`), causing product extraction to return empty
+
 ## [1.0.0] - 2026-04-15
 
 ### Added
