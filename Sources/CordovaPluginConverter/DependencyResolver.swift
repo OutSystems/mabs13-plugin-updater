@@ -343,3 +343,90 @@ extension DependencyResolver {
         return nil
     }
 }
+
+// MARK: - Cordova Plugin Dependency Resolution
+
+extension DependencyResolver {
+    /// Resolve top-level Cordova plugin dependencies (<dependency> elements) to SPM equivalents.
+    /// Each dependency is checked for a Package.swift at its declared branch/tag.
+    public func resolvePluginDependencies(
+        _ dependencies: [CordovaPluginDependency],
+        timeout: TimeInterval = 30.0
+    ) async -> [ResolvedPluginDependency] {
+        logger.info("Checking \(dependencies.count) Cordova plugin dependencies for SPM packages...")
+        var results: [ResolvedPluginDependency] = []
+        await withTaskGroup(of: ResolvedPluginDependency?.self) { group in
+            for dep in dependencies {
+                group.addTask { await self.resolvePluginDependency(dep, timeout: timeout) }
+            }
+            for await resolved in group {
+                if let resolved { results.append(resolved) }
+            }
+        }
+        let resolvedCount = results.filter(\.isResolved).count
+        logger.info("Resolved \(resolvedCount) out of \(dependencies.count) Cordova plugin dependencies")
+        return results
+    }
+
+    private func resolvePluginDependency(
+        _ dependency: CordovaPluginDependency,
+        timeout: TimeInterval
+    ) async -> ResolvedPluginDependency? {
+        await withTaskGroup(of: ResolvedPluginDependency?.self) { group in
+            group.addTask { await self.performPluginResolution(for: dependency) }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                return ResolvedPluginDependency(original: dependency, spmDependency: nil, status: .timeout)
+            }
+            for await resolved in group {
+                if let resolved { group.cancelAll(); return resolved }
+            }
+            return nil
+        }
+    }
+
+    private func performPluginResolution(for dependency: CordovaPluginDependency) async -> ResolvedPluginDependency {
+        let url = dependency.gitUrl
+        let reference = dependency.reference
+        logger.debug("Checking for Package.swift in \(dependency.id) at \(url)#\(reference)")
+
+        let hasPackageSwift = await gitChecker.hasPackageSwift(in: url, at: reference)
+        guard hasPackageSwift else {
+            logger.debug("\(dependency.id): no Package.swift found at ref '\(reference)'")
+            return ResolvedPluginDependency(original: dependency, spmDependency: nil, status: .noPackageSwift)
+        }
+
+        guard let packageContent = await gitChecker.fetchPackageSwiftContent(from: url, at: reference) else {
+            return ResolvedPluginDependency(original: dependency, spmDependency: nil,
+                                            status: .packageSwiftNotAccessible)
+        }
+
+        guard let packageInfo = spmParser.parsePackageSwift(packageContent),
+              spmParser.isLibraryPackage(packageContent) else {
+            return ResolvedPluginDependency(original: dependency, spmDependency: nil, status: .notALibrary)
+        }
+
+        let requirement: SPMRequirement
+        if let tag = dependency.tag {
+            requirement = .tag(tag)
+        } else if let branch = dependency.branch {
+            requirement = .branch(branch)
+        } else {
+            requirement = .branch("main")
+        }
+
+        let id = dependency.id
+        let productName = packageInfo.products.first(where: { $0.type == .library && $0.name == id })?.name
+            ?? packageInfo.products.first(where: { $0.type == .library })?.name
+            ?? packageInfo.name
+
+        let packageName = url.components(separatedBy: "/").last
+            .map { $0.hasSuffix(".git") ? String($0.dropLast(4)) : $0 }
+            ?? packageInfo.name
+
+        let spmDep = SPMDependency(url: url, requirement: requirement,
+                                   productName: productName, packageName: packageName)
+        logger.debug("\(dependency.id): resolved to \(productName) from \(packageName)")
+        return ResolvedPluginDependency(original: dependency, spmDependency: spmDep, status: .resolved)
+    }
+}

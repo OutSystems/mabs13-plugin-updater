@@ -543,3 +543,208 @@ class MockFileSystemManager: FileSystemManager {
         "."
     }
 }
+
+// MARK: - Cordova Plugin Dependency generation tests
+
+extension PackageGeneratorTests {
+
+    func testGeneratePackageSwiftWithUnresolvedPluginDependencies() {
+        let pluginDeps = [
+            CordovaPluginDependency(
+                id: "cordova-plugin-secure-storage",
+                gitUrl: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+                branch: "spm"
+            ),
+            CordovaPluginDependency(
+                id: "cordova-sqlcipher-adapter",
+                gitUrl: "https://github.com/OutSystems/cordova-sqlcipher-adapter.git",
+                tag: "0.1.7-OS11"
+            )
+        ]
+
+        let metadata = PluginMetadata(
+            pluginId: "com.example.bundle",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            pluginDependencies: pluginDeps
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains("// TODO: Cordova plugin dependency (run --auto-resolve to check):"))
+        XCTAssertTrue(packageContent.contains("cordova-plugin-secure-storage"))
+        XCTAssertTrue(packageContent.contains("cordova-sqlcipher-adapter"))
+        let todoSecureStorage = "// TODO: Add SPM equivalent for Cordova plugin: cordova-plugin-secure-storage"
+        let todoSQLCipher = "// TODO: Add SPM equivalent for Cordova plugin: cordova-sqlcipher-adapter"
+        XCTAssertTrue(packageContent.contains(todoSecureStorage))
+        XCTAssertTrue(packageContent.contains(todoSQLCipher))
+        XCTAssertFalse(packageContent.contains(".package(url: \"https://github.com/andredestro"))
+    }
+
+    func testGeneratePackageSwiftWithResolvedPluginDependencyBranch() {
+        let pluginDep = CordovaPluginDependency(
+            id: "cordova-plugin-secure-storage",
+            gitUrl: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+            branch: "spm"
+        )
+
+        let resolvedPluginDeps = [
+            ResolvedPluginDependency(
+                original: pluginDep,
+                spmDependency: SPMDependency(
+                    url: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+                    requirement: .branch("spm"),
+                    productName: "cordova-plugin-secure-storage",
+                    packageName: "cordova-plugin-secure-storage"
+                ),
+                status: .resolved
+            )
+        ]
+
+        let metadata = PluginMetadata(
+            pluginId: "com.example.bundle",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            pluginDependencies: [pluginDep]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(
+            from: metadata,
+            resolvedPluginDependencies: resolvedPluginDeps
+        )
+
+        XCTAssertTrue(packageContent.contains(
+            ".package(url: \"https://github.com/andredestro/cordova-plugin-secure-storage.git\", branch: \"spm\")"
+        ))
+        XCTAssertTrue(packageContent.contains(
+            ".product(name: \"cordova-plugin-secure-storage\", package: \"cordova-plugin-secure-storage\")"
+        ))
+        XCTAssertFalse(packageContent.contains("// TODO: Cordova plugin dependency"))
+    }
+
+    func testGeneratePackageSwiftWithResolvedPluginDependencyTag() {
+        let pluginDep = CordovaPluginDependency(
+            id: "outsystems-plugin-disable-backup",
+            gitUrl: "https://github.com/OutSystems/outsystems-plugin-disable-backup.git",
+            tag: "1.0.2"
+        )
+
+        let resolvedPluginDeps = [
+            ResolvedPluginDependency(
+                original: pluginDep,
+                spmDependency: SPMDependency(
+                    url: "https://github.com/OutSystems/outsystems-plugin-disable-backup.git",
+                    requirement: .tag("1.0.2"),
+                    productName: "outsystems-plugin-disable-backup",
+                    packageName: "outsystems-plugin-disable-backup"
+                ),
+                status: .resolved
+            )
+        ]
+
+        let metadata = PluginMetadata(
+            pluginId: "com.example.bundle",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            pluginDependencies: [pluginDep]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(
+            from: metadata,
+            resolvedPluginDependencies: resolvedPluginDeps
+        )
+
+        XCTAssertTrue(packageContent.contains("exact: \"1.0.2\""))
+        XCTAssertTrue(packageContent.contains("outsystems-plugin-disable-backup"))
+        XCTAssertFalse(packageContent.contains("// TODO: Cordova plugin dependency"))
+    }
+
+    func testGeneratePackageSwiftWithMixedPluginDependencyResolution() {
+        let resolved = CordovaPluginDependency(
+            id: "cordova-plugin-secure-storage",
+            gitUrl: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+            branch: "spm"
+        )
+        let unresolved = CordovaPluginDependency(
+            id: "cordova-sqlcipher-adapter",
+            gitUrl: "https://github.com/OutSystems/cordova-sqlcipher-adapter.git",
+            tag: "0.1.7-OS11"
+        )
+
+        let resolvedPluginDeps = [
+            ResolvedPluginDependency(
+                original: resolved,
+                spmDependency: SPMDependency(
+                    url: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+                    requirement: .branch("spm"),
+                    productName: "cordova-plugin-secure-storage",
+                    packageName: "cordova-plugin-secure-storage"
+                ),
+                status: .resolved
+            ),
+            ResolvedPluginDependency(
+                original: unresolved,
+                spmDependency: nil,
+                status: .noPackageSwift
+            )
+        ]
+
+        let metadata = PluginMetadata(
+            pluginId: "com.example.bundle",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            pluginDependencies: [resolved, unresolved]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(
+            from: metadata,
+            resolvedPluginDependencies: resolvedPluginDeps
+        )
+
+        XCTAssertTrue(packageContent.contains("branch: \"spm\""))
+        XCTAssertTrue(packageContent.contains(".product(name: \"cordova-plugin-secure-storage\""))
+        let todoSQLCipherPkg = "// TODO: Cordova plugin dependency (No Package.swift found): cordova-sqlcipher-adapter"
+        let todoSQLCipherTarget = "// TODO: Add SPM equivalent for Cordova plugin: cordova-sqlcipher-adapter"
+        XCTAssertTrue(packageContent.contains(todoSQLCipherPkg))
+        XCTAssertTrue(packageContent.contains(todoSQLCipherTarget))
+    }
+
+    func testGeneratePackageSwiftWithNoPluginDepsHasNoPluginComments() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.simple",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: ""
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertFalse(packageContent.contains("TODO: Cordova plugin dependency"))
+        XCTAssertFalse(packageContent.contains("TODO: Add SPM equivalent for Cordova plugin"))
+    }
+
+    func testGeneratePackageSwiftCordovaIosAlwaysPresent() {
+        let pluginDep = CordovaPluginDependency(
+            id: "cordova-plugin-secure-storage",
+            gitUrl: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+            branch: "spm"
+        )
+
+        let metadata = PluginMetadata(
+            pluginId: "com.example.bundle",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            pluginDependencies: [pluginDep]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains("cordova-ios.git"))
+        XCTAssertTrue(packageContent.contains(".product(name: \"Cordova\", package: \"cordova-ios\")"))
+    }
+}

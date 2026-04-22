@@ -260,6 +260,46 @@ public struct SPMTarget: Equatable {
     }
 }
 
+// MARK: - Cordova Plugin Dependency Models
+
+/// Represents a top-level Cordova plugin dependency declared with <dependency> in plugin.xml
+public struct CordovaPluginDependency: Equatable {
+    public let id: String
+    public let gitUrl: String
+    public let branch: String?
+    public let tag: String?
+
+    public init(id: String, gitUrl: String, branch: String? = nil, tag: String? = nil) {
+        self.id = id
+        self.gitUrl = gitUrl
+        self.branch = branch
+        self.tag = tag
+    }
+
+    public var reference: String { tag ?? branch ?? "main" }
+
+    public var description: String {
+        var desc = "\(id) (\(gitUrl)"
+        if let tag { desc += "#\(tag)" } else if let branch { desc += "#\(branch)" }
+        return desc + ")"
+    }
+}
+
+/// Result of resolving a Cordova plugin dependency to an SPM package
+public struct ResolvedPluginDependency: Equatable {
+    public let original: CordovaPluginDependency
+    public let spmDependency: SPMDependency?
+    public let status: ResolutionStatus
+
+    public init(original: CordovaPluginDependency, spmDependency: SPMDependency?, status: ResolutionStatus) {
+        self.original = original
+        self.spmDependency = spmDependency
+        self.status = status
+    }
+
+    public var isResolved: Bool { status == .resolved && spmDependency != nil }
+}
+
 // MARK: - Dependency Resolution Models
 
 /// Status of dependency resolution attempt
@@ -353,6 +393,8 @@ public struct PluginMetadata: Equatable {
     public let systemFrameworks: [SystemFramework]
     /// Header file paths declared via <header-file> in the iOS platform
     public let headerPaths: [String]
+    /// Top-level Cordova plugin dependencies declared with <dependency> in plugin.xml
+    public let pluginDependencies: [CordovaPluginDependency]
 
     public init(
         pluginId: String,
@@ -362,7 +404,8 @@ public struct PluginMetadata: Equatable {
         localFrameworks: [LocalXCFramework] = [],
         nativeSources: [NativeSourceFile] = [],
         systemFrameworks: [SystemFramework] = [],
-        headerPaths: [String] = []
+        headerPaths: [String] = [],
+        pluginDependencies: [CordovaPluginDependency] = []
     ) {
         self.pluginId = pluginId
         self.dependencies = dependencies
@@ -372,6 +415,7 @@ public struct PluginMetadata: Equatable {
         self.nativeSources = nativeSources
         self.systemFrameworks = systemFrameworks
         self.headerPaths = headerPaths
+        self.pluginDependencies = pluginDependencies
     }
 
     /// Package name derived from plugin ID
@@ -382,6 +426,11 @@ public struct PluginMetadata: Equatable {
     /// Whether this plugin has any CocoaPods dependencies
     public var hasDependencies: Bool {
         !dependencies.isEmpty
+    }
+
+    /// Whether this plugin has any top-level Cordova plugin dependencies
+    public var hasPluginDependencies: Bool {
+        !pluginDependencies.isEmpty
     }
 
     /// Whether this plugin has native source files (Obj-C/C) but no CocoaPods

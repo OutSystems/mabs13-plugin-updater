@@ -13,12 +13,14 @@ public class PackageGenerator {
         from metadata: PluginMetadata,
         sourcePath: String = "src/ios",
         fileManager: FileSystemManager? = nil,
-        resolvedDependencies: [ResolvedDependency]? = nil
+        resolvedDependencies: [ResolvedDependency]? = nil,
+        resolvedPluginDependencies: [ResolvedPluginDependency]? = nil
     ) -> String {
         let packageName = metadata.packageName
         let (packageDepsString, targetDepsString) = buildDependencyStrings(
             from: metadata,
-            resolvedDependencies: resolvedDependencies
+            resolvedDependencies: resolvedDependencies,
+            resolvedPluginDependencies: resolvedPluginDependencies
         )
 
         // Compute source layout from native sources when available
@@ -69,7 +71,8 @@ public class PackageGenerator {
 
     private static func buildDependencyStrings(
         from metadata: PluginMetadata,
-        resolvedDependencies: [ResolvedDependency]?
+        resolvedDependencies: [ResolvedDependency]?,
+        resolvedPluginDependencies: [ResolvedPluginDependency]?
     ) -> (packageDeps: String, targetDeps: String) {
         var packageDependencies = [
             "        .package(url: \"https://github.com/apache/cordova-ios.git\", branch: \"master\")"
@@ -86,6 +89,19 @@ public class PackageGenerator {
         } else {
             addUnresolvedDependencyComments(
                 dependencies: metadata.dependencies,
+                packageDependencies: &packageDependencies,
+                targetDependencies: &targetDependencies
+            )
+        }
+        if let resolvedPluginDeps = resolvedPluginDependencies {
+            addResolvedPluginDependencies(
+                resolvedPluginDeps: resolvedPluginDeps,
+                packageDependencies: &packageDependencies,
+                targetDependencies: &targetDependencies
+            )
+        } else {
+            addUnresolvedPluginDependencyComments(
+                dependencies: metadata.pluginDependencies,
                 packageDependencies: &packageDependencies,
                 targetDependencies: &targetDependencies
             )
@@ -172,58 +188,6 @@ public class PackageGenerator {
         return result
     }
 
-    /// Add resolved SPM dependencies to package and target dependencies
-    /// - Parameters:
-    ///   - resolvedDeps: Array of resolved dependencies
-    ///   - packageDependencies: Package-level dependencies array (modified in place)
-    ///   - targetDependencies: Target-level dependencies array (modified in place)
-    private static func addResolvedDependencies(
-        resolvedDeps: [ResolvedDependency],
-        packageDependencies: inout [String],
-        targetDependencies: inout [String]
-    ) {
-        for resolvedDep in resolvedDeps {
-            if let spmDep = resolvedDep.spmDependency {
-                // Add resolved SPM dependency
-                let packageEntry = "        .package(url: \"\(spmDep.url)\", \(spmDep.requirement.description))"
-                packageDependencies.append(packageEntry)
-
-                // Add target dependency
-                let productName = spmDep.productName ?? resolvedDep.originalPod.name
-                let pkgName = spmDep.packageName ?? extractPackageName(from: spmDep.url)
-                let targetEntry = "                .product(name: \"\(productName)\", " +
-                    "package: \"\(pkgName)\")"
-                targetDependencies.append(targetEntry)
-            } else {
-                // Add comment for unresolved dependency
-                let todoPackage = "        // TODO: Convert CocoaPods dependency: " +
-                    "\(resolvedDep.originalPod.description) (\(resolvedDep.status.description))"
-                packageDependencies.append(todoPackage)
-
-                let todoTarget = "                // TODO: Add Swift Package equivalent for: " +
-                    "\(resolvedDep.originalPod.description)"
-                targetDependencies.append(todoTarget)
-            }
-        }
-    }
-
-    /// Add traditional comments for unresolved dependencies
-    /// - Parameters:
-    ///   - dependencies: Array of CocoaPods dependencies
-    ///   - packageDependencies: Package-level dependencies array (modified in place)
-    ///   - targetDependencies: Target-level dependencies array (modified in place)
-    private static func addUnresolvedDependencyComments(
-        dependencies: [PodDependency],
-        packageDependencies: inout [String],
-        targetDependencies: inout [String]
-    ) {
-        for dependency in dependencies {
-            packageDependencies.append("        // TODO: Convert CocoaPods dependency: \(dependency.description)")
-            targetDependencies
-                .append("                // TODO: Add Swift Package equivalent for: \(dependency.description)")
-        }
-    }
-
     /// Extract package name from Git URL for use in target dependencies
     /// - Parameter url: Git repository URL
     /// - Returns: Package name (typically repository name)
@@ -255,5 +219,87 @@ public class PackageGenerator {
         ]
 
         return requiredElements.allSatisfy { content.contains($0) }
+    }
+}
+
+// MARK: - Dependency Generation Helpers
+
+extension PackageGenerator {
+    fileprivate static func addResolvedDependencies(
+        resolvedDeps: [ResolvedDependency],
+        packageDependencies: inout [String],
+        targetDependencies: inout [String]
+    ) {
+        for resolvedDep in resolvedDeps {
+            if let spmDep = resolvedDep.spmDependency {
+                let packageEntry = "        .package(url: \"\(spmDep.url)\", \(spmDep.requirement.description))"
+                packageDependencies.append(packageEntry)
+                let productName = spmDep.productName ?? resolvedDep.originalPod.name
+                let pkgName = spmDep.packageName ?? extractPackageName(from: spmDep.url)
+                let targetEntry = "                .product(name: \"\(productName)\", package: \"\(pkgName)\")"
+                targetDependencies.append(targetEntry)
+            } else {
+                let todoPackage = "        // TODO: Convert CocoaPods dependency: " +
+                    "\(resolvedDep.originalPod.description) (\(resolvedDep.status.description))"
+                packageDependencies.append(todoPackage)
+                let todoTarget = "                // TODO: Add Swift Package equivalent for: " +
+                    "\(resolvedDep.originalPod.description)"
+                targetDependencies.append(todoTarget)
+            }
+        }
+    }
+
+    fileprivate static func addUnresolvedDependencyComments(
+        dependencies: [PodDependency],
+        packageDependencies: inout [String],
+        targetDependencies: inout [String]
+    ) {
+        for dependency in dependencies {
+            packageDependencies.append("        // TODO: Convert CocoaPods dependency: \(dependency.description)")
+            targetDependencies
+                .append("                // TODO: Add Swift Package equivalent for: \(dependency.description)")
+        }
+    }
+
+    fileprivate static func addResolvedPluginDependencies(
+        resolvedPluginDeps: [ResolvedPluginDependency],
+        packageDependencies: inout [String],
+        targetDependencies: inout [String]
+    ) {
+        for resolved in resolvedPluginDeps {
+            if let spmDep = resolved.spmDependency {
+                packageDependencies.append(
+                    "        .package(url: \"\(spmDep.url)\", \(spmDep.requirement.description))"
+                )
+                let productName = spmDep.productName ?? resolved.original.id
+                let pkgName = spmDep.packageName ?? extractPackageName(from: spmDep.url)
+                targetDependencies.append(
+                    "                .product(name: \"\(productName)\", package: \"\(pkgName)\")"
+                )
+            } else {
+                let reason = resolved.status.description
+                packageDependencies.append(
+                    "        // TODO: Cordova plugin dependency (\(reason)): \(resolved.original.description)"
+                )
+                targetDependencies.append(
+                    "                // TODO: Add SPM equivalent for Cordova plugin: \(resolved.original.id)"
+                )
+            }
+        }
+    }
+
+    fileprivate static func addUnresolvedPluginDependencyComments(
+        dependencies: [CordovaPluginDependency],
+        packageDependencies: inout [String],
+        targetDependencies: inout [String]
+    ) {
+        for dep in dependencies {
+            packageDependencies.append(
+                "        // TODO: Cordova plugin dependency (run --auto-resolve to check): \(dep.description)"
+            )
+            targetDependencies.append(
+                "                // TODO: Add SPM equivalent for Cordova plugin: \(dep.id)"
+            )
+        }
     }
 }

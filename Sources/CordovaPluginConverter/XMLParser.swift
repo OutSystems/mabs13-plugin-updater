@@ -55,6 +55,7 @@ public class XMLParser {
         var nativeSources: [NativeSourceFile] = []
         var systemFrameworks: [SystemFramework] = []
         var headerPaths: [String] = []
+        let pluginDependencies = parseCordovaPluginDependencies(from: xml["plugin"])
 
         for platform in xml["plugin"]["platform"].all {
             guard let platformName = platform.element?.attribute(by: "name")?.text,
@@ -91,7 +92,8 @@ public class XMLParser {
             localFrameworks: localFrameworks,
             nativeSources: nativeSources,
             systemFrameworks: systemFrameworks,
-            headerPaths: headerPaths
+            headerPaths: headerPaths,
+            pluginDependencies: pluginDependencies
         )
     }
 
@@ -239,5 +241,53 @@ public class XMLParser {
         }
 
         return updatedContent
+    }
+}
+
+// MARK: - Cordova Plugin Dependency Parsing
+
+extension XMLParser {
+    /// Parse top-level <dependency> elements that represent Cordova plugin dependencies.
+    /// Supports both `url=` and `path=` attributes, and extracts branch/tag from URL fragment (#ref).
+    fileprivate static func parseCordovaPluginDependencies(from plugin: XMLIndexer) -> [CordovaPluginDependency] {
+        var deps: [CordovaPluginDependency] = []
+        for dep in plugin["dependency"].all {
+            guard let id = dep.element?.attribute(by: "id")?.text else { continue }
+            let rawUrl = dep.element?.attribute(by: "url")?.text
+                ?? dep.element?.attribute(by: "path")?.text
+            guard let rawUrl,
+                  rawUrl.contains("github.com") || rawUrl.contains("gitlab") || rawUrl.hasSuffix(".git")
+            else { continue }
+            let components = parseGitUrlWithFragment(rawUrl)
+            guard !components.gitUrl.isEmpty else { continue }
+            let pluginDep = CordovaPluginDependency(id: id, gitUrl: components.gitUrl,
+                                                    branch: components.branch, tag: components.tag)
+            if !deps.contains(pluginDep) { deps.append(pluginDep) }
+        }
+        return deps
+    }
+
+    private struct GitFragmentComponents {
+        let gitUrl: String
+        let branch: String?
+        let tag: String?
+    }
+
+    /// Split a git URL that may contain a `#fragment` into its components.
+    /// A fragment that starts with a digit or 'v' followed by a digit is treated as a tag;
+    /// anything else (e.g. "spm", "main") is treated as a branch name.
+    private static func parseGitUrlWithFragment(_ rawUrl: String) -> GitFragmentComponents {
+        guard let hashIndex = rawUrl.firstIndex(of: "#") else {
+            return GitFragmentComponents(gitUrl: rawUrl, branch: nil, tag: nil)
+        }
+        let gitUrl = String(rawUrl[rawUrl.startIndex..<hashIndex])
+        let fragment = String(rawUrl[rawUrl.index(after: hashIndex)...])
+        guard !fragment.isEmpty else {
+            return GitFragmentComponents(gitUrl: gitUrl, branch: nil, tag: nil)
+        }
+        let looksLikeVersion = fragment.range(of: #"^v?\d"#, options: .regularExpression) != nil
+        return looksLikeVersion
+            ? GitFragmentComponents(gitUrl: gitUrl, branch: nil, tag: fragment)
+            : GitFragmentComponents(gitUrl: gitUrl, branch: fragment, tag: nil)
     }
 }

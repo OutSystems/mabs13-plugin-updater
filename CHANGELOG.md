@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-04-22
+
+### Added
+
+- Cordova plugin dependency support: top-level `<dependency>` elements in `plugin.xml` are now
+  parsed and can be resolved to SPM packages when `--auto-resolve` is used
+- Both `url=` and `path=` attributes are accepted on `<dependency>` elements
+- URL fragments (`#branch` or `#tag`) are automatically classified: fragments starting with a digit
+  or 'v' followed by a digit are treated as tags (e.g. `#1.0.2`, `#v2.0.0`); anything else is
+  treated as a branch name (e.g. `#spm`, `#main`)
+- Without `--auto-resolve`, plugin dependencies are emitted as `// TODO:` comments with a hint to
+  run `--auto-resolve`
+- 27 new unit tests covering `<dependency>` parsing, branch/tag classification, the full
+  SecureSQLiteBundle scenario, `CordovaPluginDependency` model behavior, and Package.swift
+  generation with resolved/unresolved plugin dependencies
+
 ## [1.1.0] - 2026-04-17
 
 ### Added

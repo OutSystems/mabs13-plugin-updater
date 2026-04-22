@@ -36,11 +36,12 @@ public class CordovaToSPMConverter {
             displayPluginInfo(metadata)
 
             // Step 3: Generate and write Package.swift (includes auto-resolution if enabled)
-            let (packageResult, resolvedDeps) = try await generatePackageSwiftWithDependencies(
+            let outcome = try await generatePackageSwiftWithDependencies(
                 metadata,
                 pluginDirectory: pluginXMLPath.directoryPath
             )
-            resolvedDependencies = resolvedDeps
+            resolvedDependencies = outcome.resolvedPods
+            let resolvedPluginDeps = outcome.resolvedPlugins
 
             // Step 4: Update plugin.xml if needed
             let xmlUpdateResult = try updatePluginXMLIfNeeded(metadata, at: pluginXMLPath)
@@ -56,9 +57,10 @@ public class CordovaToSPMConverter {
             // Step 7: Display final summary
             displayFinalSummary(
                 metadata,
-                packageResult: packageResult,
+                packageResult: outcome.result,
                 xmlUpdated: xmlUpdateResult,
-                resolvedDependencies: resolvedDependencies
+                resolvedDependencies: resolvedDependencies,
+                resolvedPluginDependencies: resolvedPluginDeps
             )
 
             return true
@@ -87,6 +89,14 @@ public class CordovaToSPMConverter {
 
 }
 
+// MARK: - Package Generation Outcome
+
+private struct PackageGenerationOutcome {
+    let result: ConversionResult
+    let resolvedPods: [ResolvedDependency]?
+    let resolvedPlugins: [ResolvedPluginDependency]?
+}
+
 // MARK: - Display Helpers
 extension CordovaToSPMConverter {
     private func displayPluginInfo(_ metadata: PluginMetadata) {
@@ -106,8 +116,15 @@ extension CordovaToSPMConverter {
             }
         }
 
-        if !metadata.hasDependencies && !metadata.hasNativeSources {
-            logger.warn("No CocoaPods dependencies or native source files found")
+        if metadata.hasPluginDependencies {
+            logger.info("Found \(metadata.pluginDependencies.count) Cordova plugin dependency(ies):")
+            for dep in metadata.pluginDependencies {
+                logger.info("  - \(dep.description)")
+            }
+        }
+
+        if !metadata.hasDependencies && !metadata.hasNativeSources && !metadata.hasPluginDependencies {
+            logger.warn("No CocoaPods dependencies, native source files, or Cordova plugin dependencies found")
         }
 
         if !metadata.systemFrameworks.isEmpty {
@@ -139,9 +156,48 @@ extension CordovaToSPMConverter {
         }
     }
 
+    private func resolveAllDependencies(
+        from metadata: PluginMetadata
+    ) async -> ([ResolvedDependency]?, [ResolvedPluginDependency]?) {
+        let resolver = DependencyResolver(logger: logger)
+        var pods: [ResolvedDependency]?
+        var plugins: [ResolvedPluginDependency]?
+        if metadata.hasDependencies {
+            logger.info("Attempting automatic dependency resolution...")
+            let resolved = await resolver.resolveCocoaPodDependencies(metadata.dependencies)
+            pods = resolved
+            displayResolutionResults(resolved)
+        }
+        if metadata.hasPluginDependencies {
+            let resolved = await resolver.resolvePluginDependencies(metadata.pluginDependencies)
+            plugins = resolved
+            displayPluginResolutionResults(resolved)
+        }
+        return (pods, plugins)
+    }
+
+    private func displayPluginResolutionResults(_ resolved: [ResolvedPluginDependency]) {
+        let resolvedCount = resolved.filter(\.isResolved).count
+        if resolvedCount > 0 {
+            logger.success("Resolved \(resolvedCount) out of \(resolved.count) Cordova plugin dependencies:")
+            for dep in resolved {
+                if let spmDep = dep.spmDependency {
+                    logger.info("  ✅ \(dep.original.id) → \(spmDep.productName ?? dep.original.id)")
+                } else {
+                    logger.warn("  ❌ \(dep.original.id): \(dep.status.description)")
+                }
+            }
+        } else {
+            logger.warn("No Cordova plugin dependencies could be resolved as SPM packages")
+            for dep in resolved {
+                logger.debug("  \(dep.original.id): \(dep.status.description)")
+            }
+        }
+    }
+
     private func generatePackageSwiftWithDependencies(_ metadata: PluginMetadata,
                                                       pluginDirectory: String) async throws
-        -> (ConversionResult, [ResolvedDependency]?) {
+        -> PackageGenerationOutcome {
         let packageSwiftPath = pluginDirectory.appendingPathComponent("Package.swift")
 
         // Check if Package.swift already exists
@@ -153,7 +209,10 @@ extension CordovaToSPMConverter {
 
             if !shouldOverwrite {
                 logger.info("Skipping Package.swift generation")
-                return (.skipped("User chose not to overwrite existing Package.swift"), nil)
+                return PackageGenerationOutcome(
+                    result: .skipped("User chose not to overwrite existing Package.swift"),
+                    resolvedPods: nil, resolvedPlugins: nil
+                )
             }
 
             // Create backup before overwriting if backup flag is enabled
@@ -166,20 +225,16 @@ extension CordovaToSPMConverter {
         }
 
         // Resolve dependencies automatically if requested
-        var resolvedDependencies: [ResolvedDependency]?
-        if options.autoResolve, metadata.hasDependencies {
-            logger.info("Attempting automatic dependency resolution...")
-            let resolver = DependencyResolver(logger: logger)
-            let resolved = await resolver.resolveCocoaPodDependencies(metadata.dependencies)
-            resolvedDependencies = resolved
-            displayResolutionResults(resolved)
-        }
+        let (resolvedDependencies, resolvedPluginDependencies) = options.autoResolve
+            ? await resolveAllDependencies(from: metadata)
+            : (nil, nil)
 
         // Generate Package.swift content
         let packageContent = PackageGenerator.generatePackageSwift(
             from: metadata,
             fileManager: fileManager,
-            resolvedDependencies: resolvedDependencies
+            resolvedDependencies: resolvedDependencies,
+            resolvedPluginDependencies: resolvedPluginDependencies
         )
 
         // Validate generated content
@@ -192,11 +247,14 @@ extension CordovaToSPMConverter {
         // Write Package.swift
         try fileManager.writeFile(content: packageContent, to: packageSwiftPath)
 
-        if options.dryRun {
-            return (.success("[DRY-RUN] Package.swift would be generated at \(packageSwiftPath)"), resolvedDependencies)
-        } else {
-            return (.success("Package.swift generated at \(packageSwiftPath)"), resolvedDependencies)
-        }
+        let message = options.dryRun
+            ? "[DRY-RUN] Package.swift would be generated at \(packageSwiftPath)"
+            : "Package.swift generated at \(packageSwiftPath)"
+        return PackageGenerationOutcome(
+            result: .success(message),
+            resolvedPods: resolvedDependencies,
+            resolvedPlugins: resolvedPluginDependencies
+        )
     }
 
     private func updateGitignoreIfRequested(in directory: String) {
@@ -255,7 +313,8 @@ extension CordovaToSPMConverter {
         _ metadata: PluginMetadata,
         packageResult: ConversionResult,
         xmlUpdated _: Bool,
-        resolvedDependencies: [ResolvedDependency]?
+        resolvedDependencies: [ResolvedDependency]?,
+        resolvedPluginDependencies: [ResolvedPluginDependency]?
     ) {
         if options.dryRun {
             logger.info("Dry run completed - no files were modified")
@@ -308,8 +367,31 @@ extension CordovaToSPMConverter {
             logger.success("Native source files and compiler flags configured automatically.")
         }
 
-        if !metadata.hasDependencies && !metadata.hasNativeSources {
+        if metadata.hasPluginDependencies {
+            displayPluginDependencySummary(resolvedPluginDependencies)
+        }
+
+        if !metadata.hasDependencies && !metadata.hasNativeSources && !metadata.hasPluginDependencies {
             logger.success("Conversion completed! Your Package.swift is ready to use.")
+        }
+    }
+
+    private func displayPluginDependencySummary(_ resolvedPluginDependencies: [ResolvedPluginDependency]?) {
+        if let resolved = resolvedPluginDependencies {
+            let unresolvedCount = resolved.count - resolved.filter(\.isResolved).count
+            if unresolvedCount > 0 {
+                userInteraction.printImportantMessage("""
+                Manual steps required:
+                \(unresolvedCount) Cordova plugin dependency(ies) could not be resolved as SPM packages.
+                They were added as comments in Package.swift. Please integrate them manually.
+                """)
+            }
+        } else {
+            userInteraction.printImportantMessage("""
+            Manual steps required:
+            Cordova plugin dependencies were added as comments in Package.swift.
+            Use --auto-resolve to check which ones have a Package.swift available.
+            """)
         }
     }
     
