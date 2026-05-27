@@ -11,7 +11,7 @@ struct Cdv2spm: AsyncParsableCommand {
         Package.swift format, facilitating the migration from CocoaPods to Swift Package Manager
         for iOS Cordova plugins.
         """,
-        version: "1.0.0"
+        version: "1.3.0"
     )
 
     @Flag(name: .long, help: "Skip all confirmation prompts")

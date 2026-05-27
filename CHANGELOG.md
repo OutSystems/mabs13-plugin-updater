@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-27
+
+### Added
+
+- `<resource-file>` support: resource files are now parsed and emitted as SPM `resources`,
+  using `.copy` for `.bundle` directories and `.process` for other files
+- System library linking: `<framework src="libsqlite3.dylib"/>` and `<framework src="libxml2.tbd"/>`
+  now correctly map to `.linkedLibrary("sqlite3")` / `.linkedLibrary("xml2")` instead of being
+  emitted as `.linkedFramework` with the full filename
+
 ## [1.2.0] - 2026-04-22
 
 ### Added
