@@ -187,6 +187,94 @@ final class XMLParserPlatformTests: XCTestCase {
         XCTAssertEqual(metadata.localFrameworks.count, 1)
     }
 
+    func testParseXMLParsesDylibAsSystemLibrary() throws {
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.dylib" version="1.0.0">
+            <platform name="ios">
+                <framework src="libsqlite3.dylib" />
+                <framework src="libz.tbd" />
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.systemFrameworks.count, 0)
+        XCTAssertEqual(metadata.systemLibraries.count, 2)
+        let names = metadata.systemLibraries.map(\.name).sorted()
+        XCTAssertEqual(names, ["sqlite3", "z"])
+    }
+
+    func testParseXMLSeparatesFrameworksLibrariesAndXCFrameworks() throws {
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.mixed" version="1.0.0">
+            <platform name="ios">
+                <framework src="UIKit.framework" />
+                <framework src="libsqlite3.dylib" />
+                <framework src="src/ios/MyLib.xcframework" custom="true" />
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.systemFrameworks.map(\.name), ["UIKit"])
+        XCTAssertEqual(metadata.systemLibraries.map(\.name), ["sqlite3"])
+        XCTAssertEqual(metadata.localFrameworks.map(\.name), ["MyLib"])
+    }
+
+    func testParseXMLDeduplicatesSystemLibraries() throws {
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.duplib" version="1.0.0">
+            <platform name="ios">
+                <framework src="libsqlite3.dylib" />
+                <framework src="libsqlite3.dylib" />
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.systemLibraries.count, 1)
+    }
+
+    func testParseXMLParsesResourceFiles() throws {
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.resources" version="1.0.0">
+            <platform name="ios">
+                <resource-file src="src/ios/CDVEcho.bundle" target="CDVEcho.bundle" />
+                <resource-file src="src/ios/PrivacyInfo.xcprivacy" />
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.resources.count, 2)
+        XCTAssertEqual(metadata.resources[0].path, "src/ios/CDVEcho.bundle")
+        XCTAssertEqual(metadata.resources[1].path, "src/ios/PrivacyInfo.xcprivacy")
+    }
+
+    func testParseXMLDeduplicatesResourceFiles() throws {
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin id="com.example.dupres" version="1.0.0">
+            <platform name="ios">
+                <resource-file src="src/ios/CDVEcho.bundle" />
+                <resource-file src="src/ios/CDVEcho.bundle" />
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertEqual(metadata.resources.count, 1)
+    }
+
     func testParseXMLWithNestedPodspecStructure() throws {
         let xmlContent = """
         <?xml version="1.0" encoding="UTF-8"?>

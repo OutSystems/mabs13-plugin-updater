@@ -140,6 +140,28 @@ public struct SystemFramework: Equatable {
     }
 }
 
+/// A system library declared via <framework src="libX.dylib"/> or <framework src="libX.tbd"/>
+/// in the iOS platform block. Maps to SPM's `.linkedLibrary` linker setting.
+public struct SystemLibrary: Equatable {
+    /// Library name without the `lib` prefix and without the extension, e.g. "sqlite3" for "libsqlite3.dylib"
+    public let name: String
+
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+/// A resource file declared via <resource-file src="..." /> in the iOS platform block.
+/// Maps to SPM's `resources:` block on the target.
+public struct ResourceFile: Equatable {
+    /// Path relative to the plugin root, e.g. "src/ios/CDVEcho.bundle"
+    public let path: String
+
+    public init(path: String) {
+        self.path = path
+    }
+}
+
 // MARK: - Local XCFramework Models
 
 /// Represents a local .xcframework bundle referenced in plugin.xml via <framework custom="true">
@@ -391,10 +413,14 @@ public struct PluginMetadata: Equatable {
     public let nativeSources: [NativeSourceFile]
     /// System frameworks declared via <framework src="X.framework"/> in the iOS platform
     public let systemFrameworks: [SystemFramework]
+    /// System libraries declared via <framework src="libX.dylib"/> or <framework src="libX.tbd"/>
+    public let systemLibraries: [SystemLibrary]
     /// Header file paths declared via <header-file> in the iOS platform
     public let headerPaths: [String]
     /// Top-level Cordova plugin dependencies declared with <dependency> in plugin.xml
     public let pluginDependencies: [CordovaPluginDependency]
+    /// Resource files declared via <resource-file> in the iOS platform
+    public let resources: [ResourceFile]
 
     public init(
         pluginId: String,
@@ -404,8 +430,10 @@ public struct PluginMetadata: Equatable {
         localFrameworks: [LocalXCFramework] = [],
         nativeSources: [NativeSourceFile] = [],
         systemFrameworks: [SystemFramework] = [],
+        systemLibraries: [SystemLibrary] = [],
         headerPaths: [String] = [],
-        pluginDependencies: [CordovaPluginDependency] = []
+        pluginDependencies: [CordovaPluginDependency] = [],
+        resources: [ResourceFile] = []
     ) {
         self.pluginId = pluginId
         self.dependencies = dependencies
@@ -414,8 +442,10 @@ public struct PluginMetadata: Equatable {
         self.localFrameworks = localFrameworks
         self.nativeSources = nativeSources
         self.systemFrameworks = systemFrameworks
+        self.systemLibraries = systemLibraries
         self.headerPaths = headerPaths
         self.pluginDependencies = pluginDependencies
+        self.resources = resources
     }
 
     /// Package name derived from plugin ID

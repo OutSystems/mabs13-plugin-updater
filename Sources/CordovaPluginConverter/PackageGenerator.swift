@@ -36,6 +36,12 @@ public class PackageGenerator {
             : metadataHeadersPath
 
         let linkerSettings = metadata.systemFrameworks.map { LinkerSetting.linkedFramework($0.name) }
+            + metadata.systemLibraries.map { LinkerSetting.linkedLibrary($0.name) }
+
+        let resourceEntries = buildResourceEntries(
+            resources: metadata.resources,
+            sourcePath: layout.path
+        )
 
         let targetsContent = buildTargetsContent(
             targetName: packageName,
@@ -45,7 +51,8 @@ public class PackageGenerator {
             publicHeadersPath: publicHeadersPath,
             explicitSources: layout.sources,
             cSettings: layout.cSettings,
-            linkerSettings: linkerSettings
+            linkerSettings: linkerSettings,
+            resources: resourceEntries
         )
         return """
         // swift-tools-version:5.9
@@ -122,7 +129,8 @@ public class PackageGenerator {
         publicHeadersPath: String,
         explicitSources: [String] = [],
         cSettings: [CCompilerSetting] = [],
-        linkerSettings: [LinkerSetting] = []
+        linkerSettings: [LinkerSetting] = [],
+        resources: [String] = []
     ) -> String {
         var result = ""
 
@@ -165,6 +173,13 @@ public class PackageGenerator {
             result += ",\n            exclude: [\n\(excludeLines)\n            ]"
         }
 
+        if !resources.isEmpty {
+            let resourceLines = resources
+                .map { "                \($0)" }
+                .joined(separator: ",\n")
+            result += ",\n            resources: [\n\(resourceLines)\n            ]"
+        }
+
         if !publicHeadersPath.isEmpty {
             result += ",\n            publicHeadersPath: \"\(publicHeadersPath)\""
         }
@@ -186,6 +201,27 @@ public class PackageGenerator {
         result += ")"
 
         return result
+    }
+
+    /// Build SPM resource entries (`.copy(...)` / `.process(...)`) from parsed <resource-file> elements.
+    /// Paths inside `sourcePath` are normalized to be relative to the target's path, because SPM
+    /// requires resource paths to be inside the target. Resources outside the target path are skipped.
+    /// `.bundle` directories use `.copy` to preserve structure; everything else uses `.process`.
+    private static func buildResourceEntries(resources: [ResourceFile], sourcePath: String) -> [String] {
+        let prefix = sourcePath + "/"
+        return resources.compactMap { resource -> String? in
+            let relativePath: String
+            if resource.path.hasPrefix(prefix) {
+                relativePath = String(resource.path.dropFirst(prefix.count))
+            } else if resource.path == sourcePath {
+                return nil
+            } else {
+                // SPM requires resources to be inside the target path. Skip silently.
+                return nil
+            }
+            let rule = resource.path.hasSuffix(".bundle") ? "copy" : "process"
+            return ".\(rule)(\"\(relativePath)\")"
+        }
     }
 
     /// Extract package name from Git URL for use in target dependencies

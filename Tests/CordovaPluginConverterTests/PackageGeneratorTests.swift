@@ -428,6 +428,106 @@ final class PackageGeneratorTests: XCTestCase {
         XCTAssertTrue(packageContent.contains(".linkedFramework(\"CoreLocation\")"))
     }
 
+    func testGeneratePackageSwiftEmitsLinkedLibraryForSystemLibraries() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.libs",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [NativeSourceFile(path: "src/ios/Plugin.m")],
+            systemLibraries: [SystemLibrary(name: "sqlite3"), SystemLibrary(name: "z")]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains("linkerSettings: ["))
+        XCTAssertTrue(packageContent.contains(".linkedLibrary(\"sqlite3\")"))
+        XCTAssertTrue(packageContent.contains(".linkedLibrary(\"z\")"))
+        // Must NOT emit .linkedFramework for libraries
+        XCTAssertFalse(packageContent.contains(".linkedFramework(\"sqlite3\")"))
+        XCTAssertFalse(packageContent.contains(".linkedFramework(\"libsqlite3.dylib\")"))
+    }
+
+    func testGeneratePackageSwiftCombinesFrameworksAndLibraries() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.mixed",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [NativeSourceFile(path: "src/ios/Plugin.m")],
+            systemFrameworks: [SystemFramework(name: "Security")],
+            systemLibraries: [SystemLibrary(name: "sqlite3")]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains(".linkedFramework(\"Security\")"))
+        XCTAssertTrue(packageContent.contains(".linkedLibrary(\"sqlite3\")"))
+    }
+
+    func testGeneratePackageSwiftEmitsResourcesCopyForBundle() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.bundle",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [NativeSourceFile(path: "src/ios/Plugin.m")],
+            resources: [ResourceFile(path: "src/ios/CDVEcho.bundle")]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains("resources: ["))
+        // Path is normalized to be relative to target path (src/ios)
+        XCTAssertTrue(packageContent.contains(".copy(\"CDVEcho.bundle\")"))
+    }
+
+    func testGeneratePackageSwiftEmitsResourcesProcessForNonBundle() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.privacy",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [NativeSourceFile(path: "src/ios/Plugin.m")],
+            resources: [ResourceFile(path: "src/ios/PrivacyInfo.xcprivacy")]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertTrue(packageContent.contains(".process(\"PrivacyInfo.xcprivacy\")"))
+    }
+
+    func testGeneratePackageSwiftNoResourcesBlockWhenEmpty() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.nores",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [NativeSourceFile(path: "src/ios/Plugin.m")]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertFalse(packageContent.contains("resources:"))
+    }
+
+    func testGeneratePackageSwiftSkipsResourcesOutsideTargetPath() {
+        // A resource outside the target's path cannot be referenced in SPM; the generator
+        // skips it silently rather than emitting an invalid entry.
+        let metadata = PluginMetadata(
+            pluginId: "com.example.outside",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [NativeSourceFile(path: "src/ios/Plugin.m")],
+            resources: [ResourceFile(path: "assets/icon.png")]
+        )
+
+        let packageContent = PackageGenerator.generatePackageSwift(from: metadata)
+
+        XCTAssertFalse(packageContent.contains("resources:"))
+    }
+
     func testGeneratePackageSwiftNoLinkerSettingsWhenNoSystemFrameworks() {
         let metadata = PluginMetadata(
             pluginId: "com.example.nofw",

@@ -54,7 +54,9 @@ public class XMLParser {
         var localFrameworks: [LocalXCFramework] = []
         var nativeSources: [NativeSourceFile] = []
         var systemFrameworks: [SystemFramework] = []
+        var systemLibraries: [SystemLibrary] = []
         var headerPaths: [String] = []
+        var resources: [ResourceFile] = []
         let pluginDependencies = parseCordovaPluginDependencies(from: xml["plugin"])
 
         for platform in xml["plugin"]["platform"].all {
@@ -79,9 +81,13 @@ public class XMLParser {
             for path in parseHeaderPaths(from: platform) where !headerPaths.contains(path) {
                 headerPaths.append(path)
             }
-            let (local, system) = parseFrameworks(from: platform)
-            for fw in local where !localFrameworks.contains(fw) { localFrameworks.append(fw) }
-            for fw in system where !systemFrameworks.contains(fw) { systemFrameworks.append(fw) }
+            let parsed = parseFrameworks(from: platform)
+            for fw in parsed.local where !localFrameworks.contains(fw) { localFrameworks.append(fw) }
+            for fw in parsed.system where !systemFrameworks.contains(fw) { systemFrameworks.append(fw) }
+            for lib in parsed.libraries where !systemLibraries.contains(lib) { systemLibraries.append(lib) }
+            for resource in parseResourceFiles(from: platform) where !resources.contains(resource) {
+                resources.append(resource)
+            }
         }
 
         return PluginMetadata(
@@ -92,8 +98,10 @@ public class XMLParser {
             localFrameworks: localFrameworks,
             nativeSources: nativeSources,
             systemFrameworks: systemFrameworks,
+            systemLibraries: systemLibraries,
             headerPaths: headerPaths,
-            pluginDependencies: pluginDependencies
+            pluginDependencies: pluginDependencies,
+            resources: resources
         )
     }
 
@@ -149,9 +157,10 @@ public class XMLParser {
 
     private static func parseFrameworks(
         from platform: XMLIndexer
-    ) -> (local: [LocalXCFramework], system: [SystemFramework]) {
+    ) -> (local: [LocalXCFramework], system: [SystemFramework], libraries: [SystemLibrary]) {
         var local: [LocalXCFramework] = []
         var system: [SystemFramework] = []
+        var libraries: [SystemLibrary] = []
         for framework in platform["framework"].all {
             guard let src = framework.element?.attribute(by: "src")?.text else { continue }
             let isCustom = framework.element?.attribute(by: "custom")?.text == "true"
@@ -164,10 +173,31 @@ public class XMLParser {
             guard !isCustom,
                   fwType != "gradleReference", fwType != "projectReference",
                   !src.contains(":") else { continue }
+            if src.hasSuffix(".dylib") || src.hasSuffix(".tbd") {
+                let name = systemLibraryName(from: src)
+                libraries.append(SystemLibrary(name: name))
+                continue
+            }
             let name = src.hasSuffix(".framework") ? String(src.dropLast(".framework".count)) : src
             system.append(SystemFramework(name: name))
         }
-        return (local, system)
+        return (local, system, libraries)
+    }
+
+    /// Extract the SPM-compatible library name from a `<framework>` src value like
+    /// "libsqlite3.dylib" → "sqlite3" or "libz.tbd" → "z". SPM's `.linkedLibrary` expects
+    /// the bare name without the `lib` prefix and without the extension.
+    private static func systemLibraryName(from src: String) -> String {
+        let basename = (src as NSString).lastPathComponent
+        let withoutExtension = (basename as NSString).deletingPathExtension
+        return withoutExtension.hasPrefix("lib") ? String(withoutExtension.dropFirst(3)) : withoutExtension
+    }
+
+    private static func parseResourceFiles(from platform: XMLIndexer) -> [ResourceFile] {
+        platform["resource-file"].all.compactMap { element in
+            guard let src = element.element?.attribute(by: "src")?.text else { return nil }
+            return ResourceFile(path: src)
+        }
     }
 
     /// Generate updated plugin.xml content with iOS platform package attribute
