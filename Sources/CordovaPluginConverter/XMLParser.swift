@@ -49,7 +49,32 @@ public class XMLParser {
         }
 
         let pluginPreferences = collectPreferences(from: xml["plugin"])
-        var allDependencies: [PodDependency] = []
+        let pluginDependencies = parseCordovaPluginDependencies(from: xml["plugin"])
+        var accumulator = IOSPlatformAccumulator()
+
+        for platform in xml["plugin"]["platform"].all {
+            guard let platformName = platform.element?.attribute(by: "name")?.text,
+                  platformName.lowercased() == "ios" else { continue }
+            accumulate(platform: platform, into: &accumulator, pluginPreferences: pluginPreferences)
+        }
+
+        return PluginMetadata(
+            pluginId: pluginId,
+            dependencies: accumulator.dependencies,
+            hasPodspec: accumulator.hasPodspec,
+            originalXmlContent: content,
+            localFrameworks: accumulator.localFrameworks,
+            nativeSources: accumulator.nativeSources,
+            systemFrameworks: accumulator.systemFrameworks,
+            systemLibraries: accumulator.systemLibraries,
+            headerPaths: accumulator.headerPaths,
+            pluginDependencies: pluginDependencies,
+            resources: accumulator.resources
+        )
+    }
+
+    private struct IOSPlatformAccumulator {
+        var dependencies: [PodDependency] = []
         var hasPodspec = false
         var localFrameworks: [LocalXCFramework] = []
         var nativeSources: [NativeSourceFile] = []
@@ -57,52 +82,38 @@ public class XMLParser {
         var systemLibraries: [SystemLibrary] = []
         var headerPaths: [String] = []
         var resources: [ResourceFile] = []
-        let pluginDependencies = parseCordovaPluginDependencies(from: xml["plugin"])
+    }
 
-        for platform in xml["plugin"]["platform"].all {
-            guard let platformName = platform.element?.attribute(by: "name")?.text,
-                  platformName.lowercased() == "ios" else { continue }
+    private static func accumulate(
+        platform: XMLIndexer,
+        into acc: inout IOSPlatformAccumulator,
+        pluginPreferences: [String: String]
+    ) {
+        var preferences = pluginPreferences
+        preferences.merge(collectPreferences(from: platform)) { _, new in new }
 
-            var preferences = pluginPreferences
-            preferences.merge(collectPreferences(from: platform)) { _, new in new }
-
-            if platform["podspec"].element != nil {
-                hasPodspec = true
-                let pods = parsePods(from: platform["podspec"], preferences: preferences)
-                for pod in pods where !allDependencies.contains(pod) {
-                    allDependencies.append(pod)
-                }
-            }
-
-            let newSources = parseNativeSources(from: platform)
-            for source in newSources where !nativeSources.contains(where: { $0.path == source.path }) {
-                nativeSources.append(source)
-            }
-            for path in parseHeaderPaths(from: platform) where !headerPaths.contains(path) {
-                headerPaths.append(path)
-            }
-            let parsed = parseFrameworks(from: platform)
-            for fw in parsed.local where !localFrameworks.contains(fw) { localFrameworks.append(fw) }
-            for fw in parsed.system where !systemFrameworks.contains(fw) { systemFrameworks.append(fw) }
-            for lib in parsed.libraries where !systemLibraries.contains(lib) { systemLibraries.append(lib) }
-            for resource in parseResourceFiles(from: platform) where !resources.contains(resource) {
-                resources.append(resource)
+        if platform["podspec"].element != nil {
+            acc.hasPodspec = true
+            for pod in parsePods(from: platform["podspec"], preferences: preferences)
+                where !acc.dependencies.contains(pod) {
+                acc.dependencies.append(pod)
             }
         }
 
-        return PluginMetadata(
-            pluginId: pluginId,
-            dependencies: allDependencies,
-            hasPodspec: hasPodspec,
-            originalXmlContent: content,
-            localFrameworks: localFrameworks,
-            nativeSources: nativeSources,
-            systemFrameworks: systemFrameworks,
-            systemLibraries: systemLibraries,
-            headerPaths: headerPaths,
-            pluginDependencies: pluginDependencies,
-            resources: resources
-        )
+        for source in parseNativeSources(from: platform)
+            where !acc.nativeSources.contains(where: { $0.path == source.path }) {
+            acc.nativeSources.append(source)
+        }
+        for path in parseHeaderPaths(from: platform) where !acc.headerPaths.contains(path) {
+            acc.headerPaths.append(path)
+        }
+        let parsed = parseFrameworks(from: platform)
+        for fw in parsed.local where !acc.localFrameworks.contains(fw) { acc.localFrameworks.append(fw) }
+        for fw in parsed.system where !acc.systemFrameworks.contains(fw) { acc.systemFrameworks.append(fw) }
+        for lib in parsed.libraries where !acc.systemLibraries.contains(lib) { acc.systemLibraries.append(lib) }
+        for resource in parseResourceFiles(from: platform) where !acc.resources.contains(resource) {
+            acc.resources.append(resource)
+        }
     }
 
     /// Collect Cordova variable preferences (name → default value).
@@ -155,19 +166,21 @@ public class XMLParser {
         platform["header-file"].all.compactMap { $0.element?.attribute(by: "src")?.text }
     }
 
-    private static func parseFrameworks(
-        from platform: XMLIndexer
-    ) -> (local: [LocalXCFramework], system: [SystemFramework], libraries: [SystemLibrary]) {
+    struct ParsedFrameworks {
         var local: [LocalXCFramework] = []
         var system: [SystemFramework] = []
         var libraries: [SystemLibrary] = []
+    }
+
+    private static func parseFrameworks(from platform: XMLIndexer) -> ParsedFrameworks {
+        var result = ParsedFrameworks()
         for framework in platform["framework"].all {
             guard let src = framework.element?.attribute(by: "src")?.text else { continue }
             let isCustom = framework.element?.attribute(by: "custom")?.text == "true"
             let fwType = framework.element?.attribute(by: "type")?.text ?? ""
             if src.hasSuffix(".xcframework"), isCustom {
                 let name = URL(fileURLWithPath: src).deletingPathExtension().lastPathComponent
-                local.append(LocalXCFramework(name: name, path: src))
+                result.local.append(LocalXCFramework(name: name, path: src))
                 continue
             }
             guard !isCustom,
@@ -175,13 +188,13 @@ public class XMLParser {
                   !src.contains(":") else { continue }
             if src.hasSuffix(".dylib") || src.hasSuffix(".tbd") {
                 let name = systemLibraryName(from: src)
-                libraries.append(SystemLibrary(name: name))
+                result.libraries.append(SystemLibrary(name: name))
                 continue
             }
             let name = src.hasSuffix(".framework") ? String(src.dropLast(".framework".count)) : src
-            system.append(SystemFramework(name: name))
+            result.system.append(SystemFramework(name: name))
         }
-        return (local, system, libraries)
+        return result
     }
 
     /// Extract the SPM-compatible library name from a `<framework>` src value like

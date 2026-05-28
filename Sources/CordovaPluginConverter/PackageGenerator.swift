@@ -22,27 +22,13 @@ public class PackageGenerator {
             resolvedDependencies: resolvedDependencies,
             resolvedPluginDependencies: resolvedPluginDependencies
         )
-
-        // Compute source layout from native sources when available
         let layout = computeNativeSourceLayout(from: metadata, defaultSourcePath: sourcePath)
-
-        // Determine publicHeadersPath: prefer metadata-derived value, fallback to filesystem scan
-        let metadataHeadersPath = computePublicHeadersPath(
-            from: metadata.headerPaths,
-            targetPath: layout.path
-        )
+        let metadataHeadersPath = computePublicHeadersPath(from: metadata.headerPaths, targetPath: layout.path)
         let publicHeadersPath = metadataHeadersPath.isEmpty
             ? (fileManager?.findPublicHeadersPath(in: layout.path) ?? "")
             : metadataHeadersPath
-
         let linkerSettings = metadata.systemFrameworks.map { LinkerSetting.linkedFramework($0.name) }
             + metadata.systemLibraries.map { LinkerSetting.linkedLibrary($0.name) }
-
-        let resourceEntries = buildResourceEntries(
-            resources: metadata.resources,
-            sourcePath: layout.path
-        )
-
         let targetsContent = buildTargetsContent(
             targetName: packageName,
             localFrameworks: metadata.localFrameworks,
@@ -52,7 +38,7 @@ public class PackageGenerator {
             explicitSources: layout.sources,
             cSettings: layout.cSettings,
             linkerSettings: linkerSettings,
-            resources: resourceEntries
+            resources: buildResourceEntries(resources: metadata.resources, sourcePath: layout.path)
         )
         return """
         // swift-tools-version:5.9
@@ -119,90 +105,6 @@ public class PackageGenerator {
         return (packageDependencies.joined(separator: ",\n"), targetDependencies.joined(separator: ",\n"))
     }
 
-    /// Build the content inside `targets: [...]`, including `.binaryTarget` entries
-    /// for local xcframeworks followed by the main source target.
-    private static func buildTargetsContent(
-        targetName: String,
-        localFrameworks: [LocalXCFramework],
-        targetDependenciesString: String,
-        sourcePath: String,
-        publicHeadersPath: String,
-        explicitSources: [String] = [],
-        cSettings: [CCompilerSetting] = [],
-        linkerSettings: [LinkerSetting] = [],
-        resources: [String] = []
-    ) -> String {
-        var result = ""
-
-        for framework in localFrameworks {
-            result += "        .binaryTarget(\n"
-            result += "            name: \"\(framework.name)\",\n"
-            result += "            path: \"\(framework.path)\"\n"
-            result += "        ),\n"
-        }
-
-        // When explicit sources are provided (multi-dir case) xcframeworks are not included
-        // in explicitSources, so no exclude: block is needed. In the single-dir case use
-        // the existing exclude mechanism for xcframeworks nested inside the source path.
-        let excludePaths: [String] = explicitSources.isEmpty
-            ? localFrameworks.compactMap { fw in
-                let prefix = sourcePath + "/"
-                guard fw.path.hasPrefix(prefix) else { return nil }
-                return String(fw.path.dropFirst(prefix.count))
-            }
-            : []
-
-        result += "        .target(\n"
-        result += "            name: \"\(targetName)\",\n"
-        result += "            dependencies: [\n"
-        result += targetDependenciesString + "\n"
-        result += "            ],\n"
-        result += "            path: \"\(sourcePath)\""
-
-        if !explicitSources.isEmpty {
-            let sourcesLines = explicitSources
-                .map { "                \"\($0)\"" }
-                .joined(separator: ",\n")
-            result += ",\n            sources: [\n\(sourcesLines)\n            ]"
-        }
-
-        if !excludePaths.isEmpty {
-            let excludeLines = excludePaths
-                .map { "                \"\($0)\"" }
-                .joined(separator: ",\n")
-            result += ",\n            exclude: [\n\(excludeLines)\n            ]"
-        }
-
-        if !resources.isEmpty {
-            let resourceLines = resources
-                .map { "                \($0)" }
-                .joined(separator: ",\n")
-            result += ",\n            resources: [\n\(resourceLines)\n            ]"
-        }
-
-        if !publicHeadersPath.isEmpty {
-            result += ",\n            publicHeadersPath: \"\(publicHeadersPath)\""
-        }
-
-        if !cSettings.isEmpty {
-            let settingsLines = cSettings
-                .map { "                \($0.spmCode)" }
-                .joined(separator: ",\n")
-            result += ",\n            cSettings: [\n\(settingsLines)\n            ]"
-        }
-
-        if !linkerSettings.isEmpty {
-            let linkerLines = linkerSettings
-                .map { "                \($0.spmCode)" }
-                .joined(separator: ",\n")
-            result += ",\n            linkerSettings: [\n\(linkerLines)\n            ]"
-        }
-
-        result += ")"
-
-        return result
-    }
-
     /// Build SPM resource entries (`.copy(...)` / `.process(...)`) from parsed <resource-file> elements.
     /// Paths inside `sourcePath` are normalized to be relative to the target's path, because SPM
     /// requires resource paths to be inside the target. Resources outside the target path are skipped.
@@ -255,6 +157,82 @@ public class PackageGenerator {
         ]
 
         return requiredElements.allSatisfy { content.contains($0) }
+    }
+}
+
+// MARK: - Target Content Building
+
+extension PackageGenerator {
+    /// Build the content inside `targets: [...]`, including `.binaryTarget` entries
+    /// for local xcframeworks followed by the main source target.
+    fileprivate static func buildTargetsContent(
+        targetName: String,
+        localFrameworks: [LocalXCFramework],
+        targetDependenciesString: String,
+        sourcePath: String,
+        publicHeadersPath: String,
+        explicitSources: [String] = [],
+        cSettings: [CCompilerSetting] = [],
+        linkerSettings: [LinkerSetting] = [],
+        resources: [String] = []
+    ) -> String {
+        var result = localFrameworks.map(renderBinaryTarget).joined()
+        let excludePaths = computeExcludePaths(
+            localFrameworks: localFrameworks,
+            sourcePath: sourcePath,
+            explicitSources: explicitSources
+        )
+        result += "        .target(\n"
+        result += "            name: \"\(targetName)\",\n"
+        result += "            dependencies: [\n\(targetDependenciesString)\n            ],\n"
+        result += "            path: \"\(sourcePath)\""
+        result += renderStringArrayBlock(label: "sources", values: explicitSources)
+        result += renderStringArrayBlock(label: "exclude", values: excludePaths)
+        result += renderRawArrayBlock(label: "resources", values: resources)
+        if !publicHeadersPath.isEmpty {
+            result += ",\n            publicHeadersPath: \"\(publicHeadersPath)\""
+        }
+        result += renderRawArrayBlock(label: "cSettings", values: cSettings.map(\.spmCode))
+        result += renderRawArrayBlock(label: "linkerSettings", values: linkerSettings.map(\.spmCode))
+        result += ")"
+        return result
+    }
+
+    private static func renderBinaryTarget(_ framework: LocalXCFramework) -> String {
+        """
+                .binaryTarget(
+                    name: "\(framework.name)",
+                    path: "\(framework.path)"
+                ),
+
+        """
+    }
+
+    /// When explicit sources are provided (multi-dir case) xcframeworks are not included
+    /// in explicitSources, so no exclude: block is needed.
+    private static func computeExcludePaths(
+        localFrameworks: [LocalXCFramework],
+        sourcePath: String,
+        explicitSources: [String]
+    ) -> [String] {
+        guard explicitSources.isEmpty else { return [] }
+        let prefix = sourcePath + "/"
+        return localFrameworks.compactMap { fw in
+            guard fw.path.hasPrefix(prefix) else { return nil }
+            return String(fw.path.dropFirst(prefix.count))
+        }
+    }
+
+    private static func renderStringArrayBlock(label: String, values: [String]) -> String {
+        guard !values.isEmpty else { return "" }
+        let lines = values.map { "                \"\($0)\"" }.joined(separator: ",\n")
+        return ",\n            \(label): [\n\(lines)\n            ]"
+    }
+
+    private static func renderRawArrayBlock(label: String, values: [String]) -> String {
+        guard !values.isEmpty else { return "" }
+        let lines = values.map { "                \($0)" }.joined(separator: ",\n")
+        return ",\n            \(label): [\n\(lines)\n            ]"
     }
 }
 

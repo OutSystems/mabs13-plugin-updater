@@ -1,6 +1,7 @@
 import XCTest
 @testable import cdv2spm
 
+// swiftlint:disable type_body_length
 final class XMLParserPlatformTests: XCTestCase {
     func testParseXMLWithMultipleIOSPlatforms() throws {
         let xmlContent = """
@@ -311,3 +312,4 @@ final class XMLParserPlatformTests: XCTestCase {
         XCTAssertEqual(secondPod?.spec, "2.0.0")
     }
 }
+// swiftlint:enable type_body_length
