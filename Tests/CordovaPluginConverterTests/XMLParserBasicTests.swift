@@ -39,6 +39,37 @@ final class XMLParserBasicTests: XCTestCase {
         XCTAssertEqual(sdwebimage?.spec, "~> 5.0")
     }
 
+    func testParseNameOnlyPodIsCaptured() throws {
+        // A `<pod name="X"/>` with no spec/git is valid CocoaPods syntax meaning "latest".
+        // It must still be captured as a dependency (regression test for dropped pods).
+        // Also covers a <podspec> containing a nested <config> sibling of <pods>.
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+                id="cordova-plugin-msal"
+                version="1.0.0">
+            <platform name="ios">
+                <podspec>
+                    <config>
+                        <source url="https://cdn.cocoapods.org/"/>
+                    </config>
+                    <pods use_frameworks="true">
+                        <pod name="MSAL" />
+                    </pods>
+                </podspec>
+            </platform>
+        </plugin>
+        """
+
+        let metadata = try XMLParser.parsePluginXML(content: xmlContent)
+
+        XCTAssertTrue(metadata.hasPodspec)
+        XCTAssertEqual(metadata.dependencies.count, 1)
+        let msal = metadata.dependencies.first { $0.name == "MSAL" }
+        XCTAssertNotNil(msal)
+        XCTAssertNil(msal?.spec)
+    }
+
     func testParsePluginXMLWithoutPods() throws {
         let xmlContent = """
         <?xml version="1.0" encoding="UTF-8"?>
