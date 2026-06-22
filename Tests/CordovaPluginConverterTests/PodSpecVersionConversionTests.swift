@@ -67,4 +67,30 @@ final class PodSpecVersionConversionTests: XCTestCase {
         XCTAssertEqual(PodSpecResolver.convertSpecToSPMRequirement(">= 2.0.0-alpha"), .from("2.0.0-alpha"))
         XCTAssertEqual(PodSpecResolver.convertSpecToSPMRequirement("= 1.0.0-rc.1"), .exact("1.0.0-rc.1"))
     }
+
+    // MARK: - concreteVersion(from:)
+
+    /// `pod spec cat --version` requires a concrete published version, not an operator form.
+    /// These cover the operator-stripping that fixes the "Pod spec not found" false negatives
+    /// for specs like `~> 2.0.0` and `= 8.1.5`.
+    func testConcreteVersionStripsOperators() {
+        XCTAssertEqual(PodSpecResolver.concreteVersion(from: "~> 2.0.0"), "2.0.0")
+        XCTAssertEqual(PodSpecResolver.concreteVersion(from: "= 8.1.5"), "8.1.5")
+        XCTAssertEqual(PodSpecResolver.concreteVersion(from: "=8.1.5"), "8.1.5")
+        XCTAssertEqual(PodSpecResolver.concreteVersion(from: ">= 1.2"), "1.2")
+        XCTAssertEqual(PodSpecResolver.concreteVersion(from: "> 1.0.0"), "1.0.0")
+        XCTAssertEqual(PodSpecResolver.concreteVersion(from: "<= 3.0"), "3.0")
+        XCTAssertEqual(PodSpecResolver.concreteVersion(from: "< 4.0.0"), "4.0.0")
+    }
+
+    func testConcreteVersionPassesThroughBareVersions() {
+        XCTAssertEqual(PodSpecResolver.concreteVersion(from: "1.0.0"), "1.0.0")
+        XCTAssertEqual(PodSpecResolver.concreteVersion(from: "  2.1.3  "), "2.1.3")
+    }
+
+    func testConcreteVersionReturnsNilWhenNoConcreteVersion() {
+        XCTAssertNil(PodSpecResolver.concreteVersion(from: nil))
+        XCTAssertNil(PodSpecResolver.concreteVersion(from: ""))
+        XCTAssertNil(PodSpecResolver.concreteVersion(from: "   "))
+    }
 }
