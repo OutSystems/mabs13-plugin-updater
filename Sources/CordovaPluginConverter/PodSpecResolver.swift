@@ -84,13 +84,56 @@ public class PodSpecResolver {
         }
     }
     
+    /// Extracts a concrete version string from a CocoaPods version spec for use with
+    /// `pod spec cat --version=`, which requires an exact published version (e.g. `2.0.0`)
+    /// and fails when given an operator form (e.g. `~> 2.0.0`, `= 8.1.5`, `>= 1.2`).
+    ///
+    /// Examples:
+    /// - `~> 2.0.0` → `2.0.0`
+    /// - `= 8.1.5`  → `8.1.5`
+    /// - `>= 1.2`   → `1.2`
+    /// - `1.0.0`    → `1.0.0`
+    ///
+    /// Returns `nil` when no concrete version can be extracted (e.g. empty spec), in which
+    /// case the caller should fetch the latest published spec instead.
+    static func concreteVersion(from spec: String?) -> String? {
+        guard var trimmed = spec?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty else { return nil }
+        // Strip a leading CocoaPods operator. Order matters: check 2-char operators first.
+        for op in ["~>", ">=", "<=", "==", "=", ">", "<"] where trimmed.hasPrefix(op) {
+            trimmed = String(trimmed.dropFirst(op.count)).trimmingCharacters(in: .whitespaces)
+            break
+        }
+        // Take the first whitespace-separated token (defends against multi-clause specs).
+        let token = trimmed.split(separator: " ").first.map(String.init) ?? trimmed
+        // Must look like a version: start with a digit.
+        guard let first = token.first, first.isNumber else { return nil }
+        return token
+    }
+
     // MARK: - Private Methods
-    
+
     private func fetchPodSpecInfo(name: String, version: String) async throws -> PodSpecInfo {
+        // `pod spec cat --version` requires a concrete published version, not an operator
+        // form like `~> 2.0.0`. Try the concrete version first; if that specific version
+        // isn't published (or the spec has no concrete version), fall back to the latest.
+        if let concrete = Self.concreteVersion(from: version) {
+            do {
+                return try await runPodSpecCat(name: name, exactVersion: concrete)
+            } catch {
+                logger.debug(
+                    "pod spec cat \(name) --version=\(concrete) failed; retrying latest: "
+                        + error.localizedDescription
+                )
+            }
+        }
+        return try await runPodSpecCat(name: name, exactVersion: nil)
+    }
+
+    private func runPodSpecCat(name: String, exactVersion: String?) async throws -> PodSpecInfo {
         // Build argument list without shell interpolation to prevent command injection
         var arguments = ["pod", "spec", "cat", name]
-        if !version.isEmpty {
-            arguments.append("--version=\(version)")
+        if let exactVersion, !exactVersion.isEmpty {
+            arguments.append("--version=\(exactVersion)")
         }
 
         logger.debug("Executing: \(arguments.joined(separator: " "))")
@@ -121,7 +164,7 @@ public class PodSpecResolver {
                 }
 
                 do {
-                    let podSpecInfo = try self.parsePodSpecOutput(output, name: name, version: version)
+                    let podSpecInfo = try self.parsePodSpecOutput(output, name: name, version: exactVersion ?? "")
                     continuation.resume(returning: podSpecInfo)
                 } catch {
                     continuation.resume(throwing: error)

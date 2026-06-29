@@ -138,7 +138,9 @@ public class XMLParser {
             let git = podElement.element?.attribute(by: "git")?.text
             let tag = podElement.element?.attribute(by: "tag")?.text
             let branch = podElement.element?.attribute(by: "branch")?.text
-            guard spec != nil || git != nil else { continue }
+            // A `<pod name="X"/>` with no spec/git is valid CocoaPods syntax meaning "latest
+            // published version". Such pods must still be captured as dependencies; the
+            // resolver treats a nil spec as "fetch latest". Only the name is required.
             let dependency = PodDependency(name: name, spec: spec, git: git, tag: tag, branch: branch)
             if !dependencies.contains(dependency) { dependencies.append(dependency) }
         }
