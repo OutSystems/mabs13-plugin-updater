@@ -15,7 +15,8 @@ extension PackageGenerator {
     static func computeNativeSourceLayout(
         from metadata: PluginMetadata,
         defaultSourcePath: String
-    ) -> NativeSourceLayout {
+    )
+        -> NativeSourceLayout {
         guard !metadata.nativeSources.isEmpty else {
             return NativeSourceLayout(path: defaultSourcePath, sources: [], cSettings: [])
         }
@@ -23,7 +24,7 @@ extension PackageGenerator {
         // Unique source directories, preserving declaration order
         var seenDirs = Set<String>()
         let sourceDirs = metadata.nativeSources
-            .map { $0.directory }
+            .map(\.directory)
             .filter { seenDirs.insert($0).inserted }
 
         let targetPath: String
@@ -64,7 +65,7 @@ extension PackageGenerator {
         let components = dirs.map { $0.components(separatedBy: "/") }
         let minLen = components.map(\.count).min() ?? 0
         var common: [String] = []
-        for index in 0..<minLen {
+        for index in 0 ..< minLen {
             let component = components[0][index]
             guard components.allSatisfy({ $0[index] == component }) else { break }
             common.append(component)
@@ -94,7 +95,8 @@ extension PackageGenerator {
         headerPaths: [String],
         targetPath: String,
         excludingDir publicDir: String
-    ) -> [String] {
+    )
+        -> [String] {
         var seen = Set<String>()
         var result: [String] = []
         for path in headerPaths {

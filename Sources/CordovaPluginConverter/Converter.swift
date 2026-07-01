@@ -86,7 +86,6 @@ public class CordovaToSPMConverter {
 
         return try XMLParser.parsePluginXML(at: path)
     }
-
 }
 
 // MARK: - Package Generation Outcome
@@ -98,6 +97,7 @@ private struct PackageGenerationOutcome {
 }
 
 // MARK: - Display Helpers
+
 extension CordovaToSPMConverter {
     private func displayPluginInfo(_ metadata: PluginMetadata) {
         logger.info("Plugin ID: \(metadata.pluginId)")
@@ -123,7 +123,7 @@ extension CordovaToSPMConverter {
             }
         }
 
-        if !metadata.hasDependencies && !metadata.hasNativeSources && !metadata.hasPluginDependencies {
+        if !metadata.hasDependencies, !metadata.hasNativeSources, !metadata.hasPluginDependencies {
             logger.warn("No CocoaPods dependencies, native source files, or Cordova plugin dependencies found")
         }
 
@@ -158,7 +158,8 @@ extension CordovaToSPMConverter {
 
     private func resolveAllDependencies(
         from metadata: PluginMetadata
-    ) async -> ([ResolvedDependency]?, [ResolvedPluginDependency]?) {
+    ) async
+        -> ([ResolvedDependency]?, [ResolvedPluginDependency]?) {
         let resolver = DependencyResolver(logger: logger)
         var pods: [ResolvedDependency]?
         var plugins: [ResolvedPluginDependency]?
@@ -371,7 +372,7 @@ extension CordovaToSPMConverter {
             displayPluginDependencySummary(resolvedPluginDependencies)
         }
 
-        if !metadata.hasDependencies && !metadata.hasNativeSources && !metadata.hasPluginDependencies {
+        if !metadata.hasDependencies, !metadata.hasNativeSources, !metadata.hasPluginDependencies {
             logger.success("Conversion completed! Your Package.swift is ready to use.")
         }
     }

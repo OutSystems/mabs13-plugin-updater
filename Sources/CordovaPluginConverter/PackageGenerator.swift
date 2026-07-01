@@ -15,7 +15,8 @@ public class PackageGenerator {
         fileManager: FileSystemManager? = nil,
         resolvedDependencies: [ResolvedDependency]? = nil,
         resolvedPluginDependencies: [ResolvedPluginDependency]? = nil
-    ) -> String {
+    )
+        -> String {
         let packageName = metadata.packageName
         let (packageDepsString, targetDepsString) = buildDependencyStrings(
             from: metadata,
@@ -43,7 +44,7 @@ public class PackageGenerator {
         return """
         // swift-tools-version:5.9
         import PackageDescription
-
+        
         let package = Package(
             name: "\(packageName)",
             platforms: [.iOS(.v14)],
@@ -66,7 +67,8 @@ public class PackageGenerator {
         from metadata: PluginMetadata,
         resolvedDependencies: [ResolvedDependency]?,
         resolvedPluginDependencies: [ResolvedPluginDependency]?
-    ) -> (packageDeps: String, targetDeps: String) {
+    )
+        -> (packageDeps: String, targetDeps: String) {
         var packageDependencies = [
             "        .package(url: \"https://github.com/apache/cordova-ios.git\", branch: \"master\")"
         ]
@@ -175,7 +177,8 @@ extension PackageGenerator {
         cSettings: [CCompilerSetting] = [],
         linkerSettings: [LinkerSetting] = [],
         resources: [String] = []
-    ) -> String {
+    )
+        -> String {
         var result = localFrameworks.map(renderBinaryTarget).joined()
         let excludePaths = computeExcludePaths(
             localFrameworks: localFrameworks,
@@ -204,7 +207,7 @@ extension PackageGenerator {
                     name: "\(framework.name)",
                     path: "\(framework.path)"
                 ),
-
+        
         """
     }
 
@@ -214,7 +217,8 @@ extension PackageGenerator {
         localFrameworks: [LocalXCFramework],
         sourcePath: String,
         explicitSources: [String]
-    ) -> [String] {
+    )
+        -> [String] {
         guard explicitSources.isEmpty else { return [] }
         let prefix = sourcePath + "/"
         return localFrameworks.compactMap { fw in
@@ -238,8 +242,8 @@ extension PackageGenerator {
 
 // MARK: - Dependency Generation Helpers
 
-extension PackageGenerator {
-    fileprivate static func addResolvedDependencies(
+private extension PackageGenerator {
+    static func addResolvedDependencies(
         resolvedDeps: [ResolvedDependency],
         packageDependencies: inout [String],
         targetDependencies: inout [String]
@@ -263,7 +267,7 @@ extension PackageGenerator {
         }
     }
 
-    fileprivate static func addUnresolvedDependencyComments(
+    static func addUnresolvedDependencyComments(
         dependencies: [PodDependency],
         packageDependencies: inout [String],
         targetDependencies: inout [String]
@@ -275,7 +279,7 @@ extension PackageGenerator {
         }
     }
 
-    fileprivate static func addResolvedPluginDependencies(
+    static func addResolvedPluginDependencies(
         resolvedPluginDeps: [ResolvedPluginDependency],
         packageDependencies: inout [String],
         targetDependencies: inout [String]
@@ -302,7 +306,7 @@ extension PackageGenerator {
         }
     }
 
-    fileprivate static func addUnresolvedPluginDependencyComments(
+    static func addUnresolvedPluginDependencyComments(
         dependencies: [CordovaPluginDependency],
         packageDependencies: inout [String],
         targetDependencies: inout [String]

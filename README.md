@@ -1,6 +1,6 @@
 # cdv2spm
 
-[![CI](https://github.com/andredestro/cordova-plugin-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/andredestro/cordova-plugin-converter/actions/workflows/ci.yml)
+[![CI](https://github.com/OutSystems/cordova-plugin-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/OutSystems/cordova-plugin-converter/actions/workflows/ci.yml)
 
 `cdv2spm` converts a Cordova `plugin.xml` into a Swift Package Manager `Package.swift`, automating the migration from CocoaPods to SPM for iOS Cordova plugins.
 
@@ -55,17 +55,10 @@ The tool also:
 
 ## Installation
 
-### Homebrew (recommended)
-
-```bash
-brew tap andredestro/tap
-brew install cdv2spm
-```
-
 ### Build from source
 
 ```bash
-git clone https://github.com/andredestro/cordova-plugin-converter.git
+git clone https://github.com/OutSystems/cordova-plugin-converter.git
 cd cordova-plugin-converter
 make install
 ```

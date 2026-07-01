@@ -108,9 +108,15 @@ public class XMLParser {
             acc.headerPaths.append(path)
         }
         let parsed = parseFrameworks(from: platform)
-        for fw in parsed.local where !acc.localFrameworks.contains(fw) { acc.localFrameworks.append(fw) }
-        for fw in parsed.system where !acc.systemFrameworks.contains(fw) { acc.systemFrameworks.append(fw) }
-        for lib in parsed.libraries where !acc.systemLibraries.contains(lib) { acc.systemLibraries.append(lib) }
+        for fw in parsed.local where !acc.localFrameworks.contains(fw) {
+            acc.localFrameworks.append(fw)
+        }
+        for fw in parsed.system where !acc.systemFrameworks.contains(fw) {
+            acc.systemFrameworks.append(fw)
+        }
+        for lib in parsed.libraries where !acc.systemLibraries.contains(lib) {
+            acc.systemLibraries.append(lib)
+        }
         for resource in parseResourceFiles(from: platform) where !acc.resources.contains(resource) {
             acc.resources.append(resource)
         }
@@ -301,8 +307,7 @@ extension XMLParser {
             let rawUrl = dep.element?.attribute(by: "url")?.text
                 ?? dep.element?.attribute(by: "path")?.text
             guard let rawUrl,
-                  rawUrl.contains("github.com") || rawUrl.contains("gitlab") || rawUrl.hasSuffix(".git")
-            else { continue }
+                  rawUrl.contains("github.com") || rawUrl.contains("gitlab") || rawUrl.hasSuffix(".git") else { continue }
             let components = parseGitUrlWithFragment(rawUrl)
             guard !components.gitUrl.isEmpty else { continue }
             let pluginDep = CordovaPluginDependency(id: id, gitUrl: components.gitUrl,
@@ -325,7 +330,7 @@ extension XMLParser {
         guard let hashIndex = rawUrl.firstIndex(of: "#") else {
             return GitFragmentComponents(gitUrl: rawUrl, branch: nil, tag: nil)
         }
-        let gitUrl = String(rawUrl[rawUrl.startIndex..<hashIndex])
+        let gitUrl = String(rawUrl[rawUrl.startIndex ..< hashIndex])
         let fragment = String(rawUrl[rawUrl.index(after: hashIndex)...])
         guard !fragment.isEmpty else {
             return GitFragmentComponents(gitUrl: gitUrl, branch: nil, tag: nil)

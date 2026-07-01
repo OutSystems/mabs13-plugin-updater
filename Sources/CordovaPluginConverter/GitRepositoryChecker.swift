@@ -11,7 +11,8 @@ public class GitRepositoryChecker {
     private static func makeRegex(
         _ pattern: String,
         options: NSRegularExpression.Options = []
-    ) -> NSRegularExpression {
+    )
+        -> NSRegularExpression {
         do {
             return try NSRegularExpression(pattern: pattern, options: options)
         } catch {
@@ -98,8 +99,7 @@ public class GitRepositoryChecker {
         for regex in Self.githubPatterns {
             guard let match = regex.firstMatch(in: gitUrl, range: range),
                   let ownerRange = Range(match.range(at: 1), in: gitUrl),
-                  let repoRange = Range(match.range(at: 2), in: gitUrl)
-            else { continue }
+                  let repoRange = Range(match.range(at: 2), in: gitUrl) else { continue }
             return (String(gitUrl[ownerRange]), String(gitUrl[repoRange]))
         }
         return nil
@@ -158,8 +158,7 @@ public class GitRepositoryChecker {
         let range = NSRange(gitUrl.startIndex..., in: gitUrl)
         guard let match = Self.gitlabPattern.firstMatch(in: gitUrl, range: range),
               let hostRange = Range(match.range(at: 1), in: gitUrl),
-              let pathRange = Range(match.range(at: 2), in: gitUrl)
-        else { return nil }
+              let pathRange = Range(match.range(at: 2), in: gitUrl) else { return nil }
         return (String(gitUrl[hostRange]), String(gitUrl[pathRange]))
     }
 
@@ -220,10 +219,10 @@ public class GitRepositoryChecker {
             }
         }
     }
-
 }
 
 // MARK: - HTTP Helpers
+
 extension GitRepositoryChecker {
     private func makeHttpHeadRequest(to urlString: String) async -> Bool {
         guard let url = URL(string: urlString) else { return false }

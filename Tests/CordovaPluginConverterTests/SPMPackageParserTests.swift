@@ -15,7 +15,7 @@ final class SPMPackageParserTests: XCTestCase {
         let firebaseLikePackage = """
         // swift-tools-version:5.9
         import PackageDescription
-
+        
         let package = Package(
             name: "Firebase",
             products: [
@@ -31,7 +31,7 @@ final class SPMPackageParserTests: XCTestCase {
 
         XCTAssertNotNil(parsed)
         XCTAssertEqual(parsed?.name, "Firebase")
-        let productNames = parsed?.products.map { $0.name } ?? []
+        let productNames = parsed?.products.map(\.name) ?? []
         XCTAssertTrue(productNames.contains("Firebase"))
         XCTAssertTrue(productNames.contains("FirebaseMessaging"))
         XCTAssertTrue(productNames.contains("FirebaseAuth"))

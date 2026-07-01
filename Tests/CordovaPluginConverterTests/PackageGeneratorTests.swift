@@ -647,12 +647,11 @@ class MockFileSystemManager: FileSystemManager {
 // MARK: - Cordova Plugin Dependency generation tests
 
 extension PackageGeneratorTests {
-
     func testGeneratePackageSwiftWithUnresolvedPluginDependencies() {
         let pluginDeps = [
             CordovaPluginDependency(
                 id: "cordova-plugin-secure-storage",
-                gitUrl: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+                gitUrl: "https://github.com/OutSystems/cordova-plugin-secure-storage.git",
                 branch: "spm"
             ),
             CordovaPluginDependency(
@@ -679,13 +678,13 @@ extension PackageGeneratorTests {
         let todoSQLCipher = "// TODO: Add SPM equivalent for Cordova plugin: cordova-sqlcipher-adapter"
         XCTAssertTrue(packageContent.contains(todoSecureStorage))
         XCTAssertTrue(packageContent.contains(todoSQLCipher))
-        XCTAssertFalse(packageContent.contains(".package(url: \"https://github.com/andredestro"))
+        XCTAssertFalse(packageContent.contains(".package(url: \"https://github.com/OutSystems"))
     }
 
     func testGeneratePackageSwiftWithResolvedPluginDependencyBranch() {
         let pluginDep = CordovaPluginDependency(
             id: "cordova-plugin-secure-storage",
-            gitUrl: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+            gitUrl: "https://github.com/OutSystems/cordova-plugin-secure-storage.git",
             branch: "spm"
         )
 
@@ -693,7 +692,7 @@ extension PackageGeneratorTests {
             ResolvedPluginDependency(
                 original: pluginDep,
                 spmDependency: SPMDependency(
-                    url: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+                    url: "https://github.com/OutSystems/cordova-plugin-secure-storage.git",
                     requirement: .branch("spm"),
                     productName: "cordova-plugin-secure-storage",
                     packageName: "cordova-plugin-secure-storage"
@@ -716,7 +715,7 @@ extension PackageGeneratorTests {
         )
 
         XCTAssertTrue(packageContent.contains(
-            ".package(url: \"https://github.com/andredestro/cordova-plugin-secure-storage.git\", branch: \"spm\")"
+            ".package(url: \"https://github.com/OutSystems/cordova-plugin-secure-storage.git\", branch: \"spm\")"
         ))
         XCTAssertTrue(packageContent.contains(
             ".product(name: \"cordova-plugin-secure-storage\", package: \"cordova-plugin-secure-storage\")"
@@ -765,7 +764,7 @@ extension PackageGeneratorTests {
     func testGeneratePackageSwiftWithMixedPluginDependencyResolution() {
         let resolved = CordovaPluginDependency(
             id: "cordova-plugin-secure-storage",
-            gitUrl: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+            gitUrl: "https://github.com/OutSystems/cordova-plugin-secure-storage.git",
             branch: "spm"
         )
         let unresolved = CordovaPluginDependency(
@@ -778,7 +777,7 @@ extension PackageGeneratorTests {
             ResolvedPluginDependency(
                 original: resolved,
                 spmDependency: SPMDependency(
-                    url: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+                    url: "https://github.com/OutSystems/cordova-plugin-secure-storage.git",
                     requirement: .branch("spm"),
                     productName: "cordova-plugin-secure-storage",
                     packageName: "cordova-plugin-secure-storage"
@@ -830,7 +829,7 @@ extension PackageGeneratorTests {
     func testGeneratePackageSwiftCordovaIosAlwaysPresent() {
         let pluginDep = CordovaPluginDependency(
             id: "cordova-plugin-secure-storage",
-            gitUrl: "https://github.com/andredestro/cordova-plugin-secure-storage.git",
+            gitUrl: "https://github.com/OutSystems/cordova-plugin-secure-storage.git",
             branch: "spm"
         )
 

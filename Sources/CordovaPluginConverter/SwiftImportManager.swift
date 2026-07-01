@@ -104,8 +104,8 @@ public class SwiftImportManager {
             
             // Check for existing Cordova imports
             if trimmedLine == "import Cordova" ||
-               trimmedLine.contains("#if canImport(Cordova)") ||
-               trimmedLine.contains("import Cordova") && trimmedLine.contains("#if") {
+                trimmedLine.contains("#if canImport(Cordova)") ||
+                trimmedLine.contains("import Cordova") && trimmedLine.contains("#if") {
                 return true
             }
         }

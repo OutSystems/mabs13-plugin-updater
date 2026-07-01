@@ -75,11 +75,25 @@ public class Logger {
     }
 
     /// Convenience methods for different log levels
-    public func debug(_ message: String) { log(.debug, message) }
-    public func info(_ message: String) { log(.info, message) }
-    public func warn(_ message: String) { log(.warn, message) }
-    public func error(_ message: String) { log(.error, message) }
-    public func success(_ message: String) { log(.success, message) }
+    public func debug(_ message: String) {
+        log(.debug, message)
+    }
+
+    public func info(_ message: String) {
+        log(.info, message)
+    }
+
+    public func warn(_ message: String) {
+        log(.warn, message)
+    }
+
+    public func error(_ message: String) {
+        log(.error, message)
+    }
+
+    public func success(_ message: String) {
+        log(.success, message)
+    }
 }
 
 /// Handles user interaction and confirmation dialogs

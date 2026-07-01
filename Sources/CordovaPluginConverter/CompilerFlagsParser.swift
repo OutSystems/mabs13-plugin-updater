@@ -3,7 +3,7 @@ import Foundation
 /// Parses raw Cordova compiler-flags strings into structured SPM CCompilerSetting values.
 /// Only -D (preprocessor define) flags are extracted; other flags (e.g. -w) are ignored
 /// because SPM's cSettings API does not have a safe equivalent for warning control flags.
-public struct CompilerFlagsParser {
+public enum CompilerFlagsParser {
     /// Parse a raw compiler flags string into CCompilerSetting values.
     /// - Parameter rawFlags: Flags string from the compiler-flags attribute,
     ///   e.g. "-DSQLITE_HAS_CODEC -DHAVE_USLEEP=1 -w"
@@ -17,7 +17,7 @@ public struct CompilerFlagsParser {
                 let definition = String(token.dropFirst(2))
                 guard !definition.isEmpty else { return nil }
                 if let equalsIndex = definition.firstIndex(of: "=") {
-                    let key = String(definition[definition.startIndex..<equalsIndex])
+                    let key = String(definition[definition.startIndex ..< equalsIndex])
                     let value = String(definition[definition.index(after: equalsIndex)...])
                     guard !key.isEmpty else { return nil }
                     return .defineWithValue(key, value)

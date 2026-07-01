@@ -312,4 +312,5 @@ final class XMLParserPlatformTests: XCTestCase {
         XCTAssertEqual(secondPod?.spec, "2.0.0")
     }
 }
+
 // swiftlint:enable type_body_length

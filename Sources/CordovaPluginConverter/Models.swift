@@ -89,11 +89,11 @@ public enum CCompilerSetting: Equatable, Hashable {
     public var spmCode: String {
         switch self {
         case let .define(key):
-            return ".define(\"\(key)\")"
+            ".define(\"\(key)\")"
         case let .defineWithValue(key, value):
-            return ".define(\"\(key)\", to: \"\(value)\")"
+            ".define(\"\(key)\", to: \"\(value)\")"
         case let .headerSearchPath(path):
-            return ".headerSearchPath(\"\(path)\")"
+            ".headerSearchPath(\"\(path)\")"
         }
     }
 }
@@ -106,9 +106,9 @@ public enum LinkerSetting: Equatable {
     public var spmCode: String {
         switch self {
         case let .linkedFramework(name):
-            return ".linkedFramework(\"\(name)\")"
+            ".linkedFramework(\"\(name)\")"
         case let .linkedLibrary(name):
-            return ".linkedLibrary(\"\(name)\")"
+            ".linkedLibrary(\"\(name)\")"
         }
     }
 }
@@ -298,7 +298,9 @@ public struct CordovaPluginDependency: Equatable {
         self.tag = tag
     }
 
-    public var reference: String { tag ?? branch ?? "main" }
+    public var reference: String {
+        tag ?? branch ?? "main"
+    }
 
     public var description: String {
         var desc = "\(id) (\(gitUrl)"
@@ -319,7 +321,9 @@ public struct ResolvedPluginDependency: Equatable {
         self.status = status
     }
 
-    public var isResolved: Bool { status == .resolved && spmDependency != nil }
+    public var isResolved: Bool {
+        status == .resolved && spmDependency != nil
+    }
 }
 
 // MARK: - Dependency Resolution Models

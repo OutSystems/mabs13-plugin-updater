@@ -160,7 +160,8 @@ public class DependencyResolver {
         branch: String?,
         podSpecInfo: PodSpecInfo,
         dependency: PodDependency
-    ) async -> ResolvedDependency {
+    ) async
+        -> ResolvedDependency {
         let reference = tag ?? branch ?? "main"
         
         // Step 4: Check if Package.swift exists in the repository
@@ -225,16 +226,17 @@ public class DependencyResolver {
             status: .resolved
         )
     }
-    
 }
 
 // MARK: - HTTP Source Handling
+
 extension DependencyResolver {
     private func handleHttpSource(
         url: String,
         podSpecInfo: PodSpecInfo,
         dependency: PodDependency
-    ) async -> ResolvedDependency {
+    ) async
+        -> ResolvedDependency {
         logger.debug("Handling HTTP source for \(dependency.name): \(url)")
         
         // Try to infer Git repository from HTTP URL
@@ -352,7 +354,8 @@ extension DependencyResolver {
     public func resolvePluginDependencies(
         _ dependencies: [CordovaPluginDependency],
         timeout: TimeInterval = 30.0
-    ) async -> [ResolvedPluginDependency] {
+    ) async
+        -> [ResolvedPluginDependency] {
         logger.info("Checking \(dependencies.count) Cordova plugin dependencies for SPM packages...")
         var results: [ResolvedPluginDependency] = []
         await withTaskGroup(of: ResolvedPluginDependency?.self) { group in
@@ -371,15 +374,18 @@ extension DependencyResolver {
     private func resolvePluginDependency(
         _ dependency: CordovaPluginDependency,
         timeout: TimeInterval
-    ) async -> ResolvedPluginDependency? {
+    ) async
+        -> ResolvedPluginDependency? {
         await withTaskGroup(of: ResolvedPluginDependency?.self) { group in
             group.addTask { await self.performPluginResolution(for: dependency) }
             group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1000000000))
                 return ResolvedPluginDependency(original: dependency, spmDependency: nil, status: .timeout)
             }
             for await resolved in group {
-                if let resolved { group.cancelAll(); return resolved }
+                if let resolved { group.cancelAll()
+                    return resolved
+                }
             }
             return nil
         }
@@ -406,13 +412,12 @@ extension DependencyResolver {
             return ResolvedPluginDependency(original: dependency, spmDependency: nil, status: .notALibrary)
         }
 
-        let requirement: SPMRequirement
-        if let tag = dependency.tag {
-            requirement = .tag(tag)
+        let requirement: SPMRequirement = if let tag = dependency.tag {
+            .tag(tag)
         } else if let branch = dependency.branch {
-            requirement = .branch(branch)
+            .branch(branch)
         } else {
-            requirement = .branch("main")
+            .branch("main")
         }
 
         let id = dependency.id

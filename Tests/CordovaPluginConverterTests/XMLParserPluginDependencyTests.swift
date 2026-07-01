@@ -3,7 +3,6 @@ import XCTest
 
 // swiftlint:disable:next type_body_length
 final class XMLParserPluginDependencyTests: XCTestCase {
-
     // MARK: - Basic parsing
 
     func testParsesDependencyWithUrlAttributeAndBranch() throws {
@@ -54,7 +53,7 @@ final class XMLParserPluginDependencyTests: XCTestCase {
         <plugin xmlns="http://www.phonegap.com/ns/plugins/1.0"
                 id="com.example.plugin" version="1.0.0">
             <dependency id="cordova-plugin-secure-storage"
-                        path="https://github.com/andredestro/cordova-plugin-secure-storage.git#spm" />
+                        path="https://github.com/OutSystems/cordova-plugin-secure-storage.git#spm" />
         </plugin>
         """
         let metadata = try XMLParser.parsePluginXML(content: xml)
@@ -62,7 +61,7 @@ final class XMLParserPluginDependencyTests: XCTestCase {
         XCTAssertEqual(metadata.pluginDependencies.count, 1)
         let dep = try XCTUnwrap(metadata.pluginDependencies.first)
         XCTAssertEqual(dep.id, "cordova-plugin-secure-storage")
-        XCTAssertEqual(dep.gitUrl, "https://github.com/andredestro/cordova-plugin-secure-storage.git")
+        XCTAssertEqual(dep.gitUrl, "https://github.com/OutSystems/cordova-plugin-secure-storage.git")
         XCTAssertEqual(dep.branch, "spm")
         XCTAssertNil(dep.tag)
         XCTAssertEqual(dep.reference, "spm")
@@ -172,7 +171,7 @@ final class XMLParserPluginDependencyTests: XCTestCase {
             <dependency id="cordova-sqlcipher-adapter"
                         url="https://github.com/OutSystems/cordova-sqlcipher-adapter.git#0.1.7-OS11" />
             <dependency id="cordova-plugin-secure-storage"
-                        path="https://github.com/andredestro/cordova-plugin-secure-storage.git#spm" />
+                        path="https://github.com/OutSystems/cordova-plugin-secure-storage.git#spm" />
             <dependency id="outsystems-plugin-disable-backup"
                         url="https://github.com/OutSystems/outsystems-plugin-disable-backup.git#1.0.2" />
         </plugin>
@@ -191,7 +190,7 @@ final class XMLParserPluginDependencyTests: XCTestCase {
         )
         XCTAssertEqual(secureStorage.branch, "spm")
         XCTAssertNil(secureStorage.tag)
-        XCTAssertEqual(secureStorage.gitUrl, "https://github.com/andredestro/cordova-plugin-secure-storage.git")
+        XCTAssertEqual(secureStorage.gitUrl, "https://github.com/OutSystems/cordova-plugin-secure-storage.git")
 
         let disableBackup = try XCTUnwrap(
             metadata.pluginDependencies.first { $0.id == "outsystems-plugin-disable-backup" }
