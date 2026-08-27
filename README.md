@@ -4,6 +4,8 @@
 
 `cdv2spm` converts a Cordova `plugin.xml` into a Swift Package Manager `Package.swift`, automating the migration from CocoaPods to SPM for iOS Cordova plugins.
 
+> **Note:** This is an independent project. It is not affiliated with, endorsed by, or sponsored by The Apache Software Foundation. See [Trademarks](#trademarks).
+
 ## Example
 
 **Input — `plugin.xml`**
@@ -100,6 +102,14 @@ When `--auto-resolve` is used, the tool looks up each CocoaPods dependency and:
 4. Converts the CocoaPods version spec to the SPM equivalent
 
 If a dependency cannot be resolved automatically, it is added as a `// TODO:` comment in `Package.swift` for manual conversion.
+
+## Trademarks
+
+Apache, Apache Cordova, and Cordova are trademarks or registered trademarks of The Apache Software Foundation in the United States and/or other countries.
+
+This project is an independent work and is not affiliated with, endorsed by, or sponsored by The Apache Software Foundation. References to Apache Cordova in this repository are for identification purposes only — to describe the software this tool operates on — and do not imply any endorsement or association.
+
+All other trademarks are the property of their respective owners.
 
 ## License
 
