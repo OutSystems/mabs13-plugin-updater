@@ -220,7 +220,11 @@ public class XMLParser {
             return ResourceFile(path: src)
         }
     }
+}
 
+// MARK: - plugin.xml Rewriting
+
+extension XMLParser {
     /// Generate updated plugin.xml content with iOS platform package attribute
     /// - Parameters:
     ///   - metadata: Original plugin metadata
@@ -306,8 +310,7 @@ extension XMLParser {
             guard let id = dep.element?.attribute(by: "id")?.text else { continue }
             let rawUrl = dep.element?.attribute(by: "url")?.text
                 ?? dep.element?.attribute(by: "path")?.text
-            guard let rawUrl,
-                  rawUrl.contains("github.com") || rawUrl.contains("gitlab") || rawUrl.hasSuffix(".git") else { continue }
+            guard let rawUrl, isGitSource(rawUrl) else { continue }
             let components = parseGitUrlWithFragment(rawUrl)
             guard !components.gitUrl.isEmpty else { continue }
             let pluginDep = CordovaPluginDependency(id: id, gitUrl: components.gitUrl,
@@ -315,6 +318,12 @@ extension XMLParser {
             if !deps.contains(pluginDep) { deps.append(pluginDep) }
         }
         return deps
+    }
+
+    /// A `<dependency>` is treated as a Cordova plugin dependency only when its url/path
+    /// points at a Git remote we can probe for a Package.swift.
+    private static func isGitSource(_ rawUrl: String) -> Bool {
+        rawUrl.contains("github.com") || rawUrl.contains("gitlab") || rawUrl.hasSuffix(".git")
     }
 
     private struct GitFragmentComponents {
