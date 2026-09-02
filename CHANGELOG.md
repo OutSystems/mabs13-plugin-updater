@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed the tool from `cdv2spm` to `mabs13-plugin-update`. The new name uses OutSystems'
+  own product vocabulary and scopes the tool to the MABS version that requires the change,
+  rather than leading with a third-party trademark. The binary, Swift package, product,
+  target, module, and source directory names all change; the Swift module is
+  `MABS13PluginUpdate`.
+- Release artifacts are now named `mabs13-plugin-update-<tag>-macos.zip`.
+- The README and `--help` output now state the tool's scope: it updates Cordova plugins to
+  Cordova iOS 8 for MABS 13 compatibility, and no action is needed for Capacitor plugins.
+
+If you installed a previous version with `make install`, remove the old binary with
+`sudo rm /usr/local/bin/cdv2spm` before running `make install` again.
+
 ## [1.3.0] - 2026-05-27
 
 ### Added
