@@ -45,7 +45,7 @@ public enum LogLevel: String, CaseIterable {
 public class Logger {
     private let verbose: Bool
     private let noColor: Bool
-    private let queue = DispatchQueue(label: "cdv2spm.logger")
+    private let queue = DispatchQueue(label: "mabs13-plugin-update.logger")
 
     public init(verbose: Bool = false, noColor: Bool = false) {
         self.verbose = verbose

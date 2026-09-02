@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import cdv2spm
+@testable import MABS13PluginUpdate
 
 final class FileSystemManagerGitignoreTests: XCTestCase {
     var tempDirectory: String!
@@ -11,7 +11,7 @@ final class FileSystemManagerGitignoreTests: XCTestCase {
         super.setUp()
 
         // Create temporary directory for tests
-        tempDirectory = NSTemporaryDirectory() + "cdv2spm-tests-" + UUID().uuidString
+        tempDirectory = NSTemporaryDirectory() + "mabs13-plugin-update-tests-" + UUID().uuidString
         do {
             try Foundation.FileManager.default.createDirectory(
                 atPath: tempDirectory,

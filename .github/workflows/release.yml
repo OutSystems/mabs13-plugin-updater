@@ -29,22 +29,22 @@ jobs:
       - name: Create universal binary
         run: |
           lipo -create \
-            .build/arm64-apple-macosx/release/cdv2spm \
-            .build/x86_64-apple-macosx/release/cdv2spm \
-            -output cdv2spm
-          chmod +x cdv2spm
+            .build/arm64-apple-macosx/release/mabs13-plugin-update \
+            .build/x86_64-apple-macosx/release/mabs13-plugin-update \
+            -output mabs13-plugin-update
+          chmod +x mabs13-plugin-update
 
       - name: Package binary
         run: |
-          zip cdv2spm-${{ github.ref_name }}-macos.zip cdv2spm
-          shasum -a 256 cdv2spm-${{ github.ref_name }}-macos.zip > cdv2spm-${{ github.ref_name }}-macos.zip.sha256
+          zip mabs13-plugin-update-${{ github.ref_name }}-macos.zip mabs13-plugin-update
+          shasum -a 256 mabs13-plugin-update-${{ github.ref_name }}-macos.zip > mabs13-plugin-update-${{ github.ref_name }}-macos.zip.sha256
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create ${{ github.ref_name }} \
-            cdv2spm-${{ github.ref_name }}-macos.zip \
-            cdv2spm-${{ github.ref_name }}-macos.zip.sha256 \
-            --title "cdv2spm ${{ github.ref_name }}" \
+            mabs13-plugin-update-${{ github.ref_name }}-macos.zip \
+            mabs13-plugin-update-${{ github.ref_name }}-macos.zip.sha256 \
+            --title "mabs13-plugin-update ${{ github.ref_name }}" \
             --generate-notes

@@ -1,7 +1,7 @@
-# Makefile for cdv2spm - Cordova plugin.xml to Swift Package Manager converter
+# Makefile for mabs13-plugin-update - Cordova plugin.xml to Swift Package Manager converter
 
 # Variables
-BINARY_NAME = cdv2spm
+BINARY_NAME = mabs13-plugin-update
 BUILD_DIR = .build
 INSTALL_DIR = /usr/local/bin
 

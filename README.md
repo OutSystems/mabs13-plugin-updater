@@ -1,8 +1,8 @@
-# cdv2spm
+# mabs13-plugin-update
 
 [![CI](https://github.com/OutSystems/cordova-plugin-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/OutSystems/cordova-plugin-converter/actions/workflows/ci.yml)
 
-`cdv2spm` converts a Cordova `plugin.xml` into a Swift Package Manager `Package.swift`, automating the migration from CocoaPods to SPM for iOS Cordova plugins.
+`mabs13-plugin-update` converts a Cordova `plugin.xml` into a Swift Package Manager `Package.swift`, automating the migration from CocoaPods to SPM for iOS Cordova plugins.
 
 > **Note:** This is an independent project. It is not affiliated with, endorsed by, or sponsored by The Apache Software Foundation. See [Trademarks](#trademarks).
 
@@ -69,16 +69,16 @@ make install
 
 ```bash
 # Convert plugin.xml in current directory
-cdv2spm
+mabs13-plugin-update
 
 # Convert with automatic CocoaPods → SPM resolution
-cdv2spm --auto-resolve
+mabs13-plugin-update --auto-resolve
 
 # Preview changes without writing files
-cdv2spm --dry-run --verbose
+mabs13-plugin-update --dry-run --verbose
 
 # Convert a specific file
-cdv2spm path/to/plugin.xml
+mabs13-plugin-update path/to/plugin.xml
 ```
 
 ### Options

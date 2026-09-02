@@ -2,9 +2,9 @@ import ArgumentParser
 import Foundation
 
 @main
-struct Cdv2spm: AsyncParsableCommand {
+struct PluginUpdateCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "cdv2spm",
+        commandName: "mabs13-plugin-update",
         abstract: "Cordova plugin.xml to Swift Package Manager converter",
         discussion: """
         A Swift command-line tool that converts Cordova plugin.xml files to Swift Package Manager

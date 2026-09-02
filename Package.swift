@@ -1,13 +1,16 @@
 // swift-tools-version:5.9
 import PackageDescription
 
+// The executable product name is the command users type; the target name is the Swift
+// module name, so it must be a valid identifier (SwiftPM would otherwise mangle the
+// hyphens to underscores when deriving the module name from the target name).
 let package = Package(
-    name: "cdv2spm",
+    name: "mabs13-plugin-update",
     platforms: [.macOS(.v13)],
     products: [
         .executable(
-            name: "cdv2spm",
-            targets: ["cdv2spm"]
+            name: "mabs13-plugin-update",
+            targets: ["MABS13PluginUpdate"]
         )
     ],
     dependencies: [
@@ -18,17 +21,17 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "cdv2spm",
+            name: "MABS13PluginUpdate",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SWXMLHash", package: "SWXMLHash")
             ],
-            path: "Sources/CordovaPluginConverter"
+            path: "Sources/MABS13PluginUpdate"
         ),
         .testTarget(
-            name: "cdv2spmTests",
-            dependencies: ["cdv2spm"],
-            path: "Tests/CordovaPluginConverterTests"
+            name: "MABS13PluginUpdateTests",
+            dependencies: ["MABS13PluginUpdate"],
+            path: "Tests/MABS13PluginUpdateTests"
         )
     ]
 )

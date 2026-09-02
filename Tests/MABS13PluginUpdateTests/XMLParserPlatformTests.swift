@@ -1,5 +1,5 @@
 import XCTest
-@testable import cdv2spm
+@testable import MABS13PluginUpdate
 
 // swiftlint:disable type_body_length
 final class XMLParserPlatformTests: XCTestCase {

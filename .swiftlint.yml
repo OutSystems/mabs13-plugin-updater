@@ -1,4 +1,4 @@
-# SwiftLint configuration for cdv2spm project
+# SwiftLint configuration for mabs13-plugin-update project
 
 # Paths to include during linting. `--path` is ignored if present.
 included:

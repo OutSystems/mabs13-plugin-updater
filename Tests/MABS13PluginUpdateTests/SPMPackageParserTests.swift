@@ -1,5 +1,5 @@
 import XCTest
-@testable import cdv2spm
+@testable import MABS13PluginUpdate
 
 final class SPMPackageParserTests: XCTestCase {
     private var logger: Logger!
