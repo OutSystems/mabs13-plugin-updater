@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import cdv2spm
+@testable import MABS13PluginUpdate
 
 final class ConverterTests: XCTestCase {
     var tempDirectory: String!
@@ -10,7 +10,7 @@ final class ConverterTests: XCTestCase {
         super.setUp()
         
         // Create temporary directory for tests
-        tempDirectory = NSTemporaryDirectory() + "cdv2spm-converter-tests-" + UUID().uuidString
+        tempDirectory = NSTemporaryDirectory() + "mabs13-plugin-update-converter-tests-" + UUID().uuidString
         do {
             try Foundation.FileManager.default.createDirectory(
                 atPath: tempDirectory,

@@ -15,7 +15,7 @@ DerivedData/
 .vscode/
 
 # Binary output
-cdv2spm
+mabs13-plugin-update
 
 # Distribution
 dist/

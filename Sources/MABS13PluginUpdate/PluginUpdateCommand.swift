@@ -2,14 +2,17 @@ import ArgumentParser
 import Foundation
 
 @main
-struct Cdv2spm: AsyncParsableCommand {
+struct PluginUpdateCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "cdv2spm",
-        abstract: "Cordova plugin.xml to Swift Package Manager converter",
+        commandName: "mabs13-plugin-update",
+        abstract: "Updates Cordova plugins to Cordova iOS 8 for MABS 13 compatibility",
         discussion: """
-        A Swift command-line tool that converts Cordova plugin.xml files to Swift Package Manager
-        Package.swift format, facilitating the migration from CocoaPods to Swift Package Manager
-        for iOS Cordova plugins.
+        MABS 13 uses Cordova iOS 8, which builds a plugin's iOS code as a Swift package \
+        rather than through CocoaPods. This tool generates the Package.swift a Cordova \
+        plugin needs and makes the matching changes to plugin.xml, leaving the plugin's \
+        existing CocoaPods build path intact so it still builds on earlier MABS versions.
+
+        No action is needed for Capacitor plugins.
         """,
         version: "1.3.0"
     )

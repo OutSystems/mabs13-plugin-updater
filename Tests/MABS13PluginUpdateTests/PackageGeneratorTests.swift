@@ -1,6 +1,6 @@
 // swiftlint:disable file_length
 import XCTest
-@testable import cdv2spm
+@testable import MABS13PluginUpdate
 
 // swiftlint:disable:next type_body_length
 final class PackageGeneratorTests: XCTestCase {
@@ -143,15 +143,15 @@ final class PackageGeneratorTests: XCTestCase {
             originalXmlContent: ""
         )
 
-        // Test with Sources/CordovaPluginConverter which should have .swift files but no .h files
+        // Test with Sources/MABS13PluginUpdate which should have .swift files but no .h files
         let packageContent = PackageGenerator.generatePackageSwift(
             from: metadata,
-            sourcePath: "Sources/CordovaPluginConverter"
+            sourcePath: "Sources/MABS13PluginUpdate"
         )
 
         // Should not contain publicHeadersPath for Swift source directory
         XCTAssertFalse(packageContent.contains("publicHeadersPath"))
-        XCTAssertTrue(packageContent.contains("path: \"Sources/CordovaPluginConverter\""))
+        XCTAssertTrue(packageContent.contains("path: \"Sources/MABS13PluginUpdate\""))
     }
 
     func testGeneratePackageSwiftWithFileManager() {
