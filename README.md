@@ -1,6 +1,6 @@
 # mabs13-plugin-update
 
-[![CI](https://github.com/OutSystems/cordova-plugin-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/OutSystems/cordova-plugin-converter/actions/workflows/ci.yml)
+[![CI](https://github.com/OutSystems/mabs13-plugin-updater/actions/workflows/ci.yml/badge.svg)](https://github.com/OutSystems/mabs13-plugin-updater/actions/workflows/ci.yml)
 
 Updates Cordova plugins to Cordova iOS 8 for MABS 13 compatibility. **No action is needed for Capacitor plugins.**
 
@@ -70,8 +70,8 @@ The tool also:
 ### Build from source
 
 ```bash
-git clone https://github.com/OutSystems/cordova-plugin-converter.git
-cd cordova-plugin-converter
+git clone https://github.com/OutSystems/mabs13-plugin-updater.git
+cd mabs13-plugin-updater
 make install
 ```
 
