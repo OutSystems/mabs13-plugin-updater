@@ -2,9 +2,12 @@
 
 [![CI](https://github.com/OutSystems/mabs13-plugin-updater/actions/workflows/ci.yml/badge.svg)](https://github.com/OutSystems/mabs13-plugin-updater/actions/workflows/ci.yml)
 
-Updates Cordova plugins to Cordova iOS 8 for MABS 13 compatibility. **No action is needed for Capacitor plugins.**
+Adds Swift Package Manager packaging to Cordova plugins so their iOS code builds under Cordova iOS 8 / MABS 13. **No action is needed for Capacitor plugins.**
 
 Maintained by OutSystems.
+
+> [!IMPORTANT]
+> Despite the name, this is not a complete MABS 13 upgrade. It handles the SPM packaging change only — it does not review your plugin's native source for breaking changes introduced by Cordova iOS 8, and it does not verify that the result builds or runs. See [Scope](#scope).
 
 ## Do you need this?
 
@@ -15,6 +18,26 @@ MABS 13 uses Cordova iOS 8, which builds a plugin's iOS code as a Swift package 
 If your plugin is a **Capacitor** plugin, it is unaffected and you do not need this tool.
 
 > **Note:** This is an independent project. It is not affiliated with, endorsed by, or sponsored by The Apache Software Foundation. See [Trademarks](#trademarks).
+
+## Scope
+
+This tool automates one mechanical part of a MABS 13 upgrade: making the plugin's iOS code buildable as a Swift package.
+
+**In scope**
+
+- Generating `Package.swift` from the dependencies declared in `<podspec>`
+- The corresponding `plugin.xml` changes (`package="swift"`, `nospm="true"`)
+- Adding `#if canImport(Cordova)` guards so sources still compile on older MABS versions
+- `.gitignore` entries for SPM build artifacts
+
+**Out of scope**
+
+- **Breaking changes in your native source.** Cordova iOS 8 changes and removes platform APIs. The tool does not read your Objective-C or Swift for uses of them, and will not tell you about them.
+- **Verifying the result.** A generated `Package.swift` is not a passing build. You still need to build the plugin against MABS 13 and exercise it in an app.
+- **Dependencies with no SPM equivalent.** `--auto-resolve` leaves these as `// TODO:` comments for you to resolve by hand.
+- **Android.** The tool touches the iOS platform only.
+
+Treat a successful run as the starting point for the upgrade, not the end of it.
 
 ## Example
 
