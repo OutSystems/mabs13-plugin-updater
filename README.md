@@ -67,7 +67,13 @@ The tool also:
 
 - Adds `package="swift"` to the iOS platform in `plugin.xml`
 - Adds `nospm="true"` to `<pod>` elements to preserve CocoaPods compatibility
-- Injects `#if canImport(Cordova)` guards into Swift source files
+- Injects `#if canImport(Cordova)` guards into the Swift files of the plugin's declared iOS
+  source directories
+- Adds `import Foundation` to Swift files that need it — a Swift package has no bridging header
+  to provide it implicitly, unlike a CocoaPods build
+- Names the target after the plugin's iOS class, keeping the plugin id as the product name
+- Raises the minimum iOS version when the plugin or a dependency requires more than the MABS 13
+  floor of iOS 15
 - Updates `.gitignore` with SPM build artifacts
 
 ## Installation
@@ -120,8 +126,22 @@ When `--auto-resolve` is used, the tool looks up each CocoaPods dependency and:
 2. Finds the Git source URL and version tag
 3. Checks if the repository contains a `Package.swift`
 4. Converts the CocoaPods version spec to the SPM equivalent
+5. Reads the dependency's own minimum iOS version, from its `Package.swift` and its podspec, and
+   raises the generated manifest's platform to match
 
 If a dependency cannot be resolved automatically, it is added as a `// TODO:` comment in `Package.swift` for manual conversion.
+
+## How the minimum iOS version is chosen
+
+The generated `platforms:` entry is the highest of:
+
+- iOS 15, the MABS 13 floor — Xcode 26 and later reject anything lower
+- a `deployment-target` or `IPHONEOS_DEPLOYMENT_TARGET` preference in the plugin's iOS platform
+- the minimum declared by each resolved dependency (with `--auto-resolve`)
+- `--min-ios`, when given
+
+Run with `--verbose` to see which of these set the version. A `--min-ios` lower than what is
+required is raised, with a warning.
 
 ## Trademarks
 

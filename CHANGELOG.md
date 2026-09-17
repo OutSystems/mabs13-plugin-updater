@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--verify`: loads the generated manifest with `swift package dump-package` and builds the
+  package for iOS with `xcodebuild`, so an unsatisfiable platform, an invalid module name or a
+  source file that does not compile outside the app target is caught here instead of in a MABS 13
+  build. A failing step exits non-zero; where Xcode is unavailable the build step is skipped with
+  a warning.
+- `--min-ios <version>`: sets the minimum iOS version of the generated `Package.swift` explicitly.
+  A version lower than what the plugin or its dependencies require is raised, with a warning.
+- The iOS deployment target is now derived rather than fixed. The floor is the highest of: the
+  MABS 13 minimum, a `deployment-target` / `IPHONEOS_DEPLOYMENT_TARGET` preference in `plugin.xml`,
+  the `platforms:` block of each resolved dependency's own `Package.swift`, and `platforms.ios`
+  from each podspec. The chosen version is logged with the reasons for it.
+
+### Fixed
+
+- The generated manifest declared `platforms: [.iOS(.v14)]`, below what MABS 13 accepts — Xcode 26
+  and later reject anything under iOS 15 during project validation. The default is now iOS 15.
+- The SPM target took its name from the plugin id, which is dotted and so not a valid Swift module
+  name. The package and product keep the id, which is how Cordova iOS 8 references the plugin, and
+  the target is now named after the plugin's iOS class (`<param name="ios-package">`, falling back
+  to the `<feature>` name and then to the id).
+- The conditional Cordova import was only injected into `src/ios`, silently doing nothing for a
+  plugin that keeps its iOS sources elsewhere. The directories now come from the plugin's own
+  `<source-file>` declarations, with `src/ios` as the fallback.
+- Swift files that use Foundation types without importing Foundation now get the import. A
+  CocoaPods build inherits it from the app target's bridging header; a Swift package has none, so
+  the same file failed with `cannot find 'Data' in scope` under MABS 13.
+
 ### Changed
 
 - Renamed the tool from `cdv2spm` to `mabs13-plugin-update`. The new name uses OutSystems'
