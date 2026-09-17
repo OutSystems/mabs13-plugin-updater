@@ -477,6 +477,13 @@ public struct PluginMetadata: Equatable {
         !nativeSources.isEmpty
     }
 
+    /// Unique directories holding the plugin's declared native sources, in declaration order.
+    /// These are the directories the tool must scan, which is not necessarily `src/ios`.
+    public var nativeSourceDirectories: [String] {
+        var seen = Set<String>()
+        return nativeSources.map(\.directory).filter { seen.insert($0).inserted }
+    }
+
     /// Dependency descriptions for logging
     public var dependencyDescriptions: [String] {
         dependencies.map(\.description)

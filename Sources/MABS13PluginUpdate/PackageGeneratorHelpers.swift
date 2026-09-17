@@ -22,10 +22,7 @@ extension PackageGenerator {
         }
 
         // Unique source directories, preserving declaration order
-        var seenDirs = Set<String>()
-        let sourceDirs = metadata.nativeSources
-            .map(\.directory)
-            .filter { seenDirs.insert($0).inserted }
+        let sourceDirs = metadata.nativeSourceDirectories
 
         let targetPath: String
         let explicitSources: [String]

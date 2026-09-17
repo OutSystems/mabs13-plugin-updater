@@ -47,7 +47,9 @@ public class CordovaToSPMConverter {
             let xmlUpdateResult = try updatePluginXMLIfNeeded(metadata, at: pluginXMLPath)
 
             // Step 5: Add conditional Cordova imports to Swift files
-            _ = addCordovaImportsToSwiftFiles(in: pluginXMLPath.directoryPath)
+            if !addCordovaImportsToSwiftFiles(metadata, in: pluginXMLPath.directoryPath) {
+                logger.warn("Some Swift files could not be updated with the conditional Cordova import")
+            }
 
             // Step 6: Update .gitignore if requested (after plugin.xml update)
             if !options.noGitignore {
@@ -400,11 +402,16 @@ extension CordovaToSPMConverter {
         }
     }
     
-    /// Add conditional Cordova imports to Swift files in src/ios directory
-    /// - Parameter pluginDirectory: The root directory of the plugin
+    /// Add conditional Cordova imports to the Swift files of the plugin's declared iOS sources,
+    /// falling back to `src/ios` when the plugin declares no `<source-file>` for iOS.
+    /// - Parameters:
+    ///   - metadata: Parsed plugin metadata, used to locate the iOS sources
+    ///   - pluginDirectory: The root directory of the plugin
     /// - Returns: True if successful, false otherwise
-    private func addCordovaImportsToSwiftFiles(in pluginDirectory: String) -> Bool {
+    private func addCordovaImportsToSwiftFiles(_ metadata: PluginMetadata, in pluginDirectory: String) -> Bool {
+        let declaredDirectories = metadata.nativeSourceDirectories
+        let sourceDirectories = declaredDirectories.isEmpty ? ["src/ios"] : declaredDirectories
         let swiftImportManager = SwiftImportManager(logger: logger, fileManager: fileManager)
-        return swiftImportManager.addCordovaImports(in: pluginDirectory)
+        return swiftImportManager.addCordovaImports(in: pluginDirectory, sourceDirectories: sourceDirectories)
     }
 }

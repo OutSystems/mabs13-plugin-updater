@@ -10,25 +10,36 @@ public class SwiftImportManager {
         self.fileManager = fileManager
     }
     
-    /// Add conditional Cordova import to all Swift files in src/ios directory
-    /// - Parameter pluginDirectory: The root directory of the plugin
+    /// Add the conditional Cordova import to the Swift files of a plugin's iOS sources.
+    /// - Parameters:
+    ///   - pluginDirectory: The root directory of the plugin
+    ///   - sourceDirectories: Directories to scan, relative to the plugin root. These come from the
+    ///     plugin's `<source-file>` declarations, so a plugin that keeps its sources somewhere other
+    ///     than `src/ios` is still processed. Missing directories are skipped.
     /// - Returns: True if successful, false otherwise
-    public func addCordovaImports(in pluginDirectory: String) -> Bool {
+    public func addCordovaImports(
+        in pluginDirectory: String,
+        sourceDirectories: [String] = ["src/ios"]
+    )
+        -> Bool {
         logger.info("Adding conditional Cordova imports to Swift files...")
-        
-        let srcIOSPath = URL(fileURLWithPath: pluginDirectory).appendingPathComponent("src/ios").path
-        
-        guard FileManager.default.fileExists(atPath: srcIOSPath) else {
-            logger.debug("No src/ios directory found at: \(srcIOSPath)")
+
+        let existingDirectories = resolveExistingDirectories(sourceDirectories, in: pluginDirectory)
+
+        guard !existingDirectories.isEmpty else {
+            logger.warn(
+                "None of the plugin's iOS source directories were found, so no Swift file was " +
+                    "updated with the conditional Cordova import: \(sourceDirectories.joined(separator: ", "))"
+            )
             return true // Not an error, just nothing to do
         }
-        
-        let swiftFiles = findSwiftFiles(in: srcIOSPath)
+
+        let swiftFiles = findSwiftFiles(in: existingDirectories)
         logger.debug("Found \(swiftFiles.count) Swift files to process")
-        
+
         var successCount = 0
         var errorCount = 0
-        
+
         for swiftFile in swiftFiles {
             if processSingleSwiftFile(at: swiftFile) {
                 successCount += 1
@@ -38,18 +49,42 @@ public class SwiftImportManager {
                 logger.error("✗ Failed to process: \(URL(fileURLWithPath: swiftFile).lastPathComponent)")
             }
         }
-        
+
         if swiftFiles.isEmpty {
-            logger.info("No Swift files found in src/ios directory")
+            logger.info("No Swift files found in \(existingDirectories.joined(separator: ", "))")
         } else {
             logger.info("Swift import processing complete: \(successCount) succeeded, \(errorCount) failed")
         }
-        
+
         return errorCount == 0
     }
-    
+
     // MARK: - Private Methods
-    
+
+    /// Map plugin-relative directories to absolute paths, keeping only those that exist.
+    private func resolveExistingDirectories(_ directories: [String], in pluginDirectory: String) -> [String] {
+        var seen = Set<String>()
+        return directories.compactMap { directory -> String? in
+            let fullPath = URL(fileURLWithPath: pluginDirectory).appendingPathComponent(directory).path
+            guard seen.insert(fullPath).inserted else { return nil }
+            guard FileManager.default.fileExists(atPath: fullPath) else {
+                logger.debug("No source directory found at: \(fullPath)")
+                return nil
+            }
+            return fullPath
+        }
+    }
+
+    /// Collect the Swift files of several directories, without processing a file twice when one
+    /// declared directory is nested inside another.
+    private func findSwiftFiles(in directories: [String]) -> [String] {
+        var seen = Set<String>()
+        return directories
+            .flatMap { findSwiftFiles(in: $0) }
+            .filter { seen.insert($0).inserted }
+            .sorted()
+    }
+
     private func findSwiftFiles(in directory: String) -> [String] {
         var swiftFiles: [String] = []
         
