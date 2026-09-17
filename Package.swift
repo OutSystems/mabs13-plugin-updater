@@ -30,7 +30,11 @@ let package = Package(
         ),
         .testTarget(
             name: "MABS13PluginUpdateTests",
-            dependencies: ["MABS13PluginUpdate"],
+            dependencies: [
+                "MABS13PluginUpdate",
+                // Needed to exercise the command's own option parsing and validation
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ],
             path: "Tests/MABS13PluginUpdateTests"
         )
     ]

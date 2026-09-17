@@ -230,12 +230,16 @@ extension CordovaToSPMConverter {
             ? await resolveAllDependencies(from: metadata)
             : (nil, nil)
 
+        let minimumIOSVersion = options.minimumIOSVersion ?? .mabs13Minimum
+        logger.info("Minimum iOS version for the generated manifest: \(minimumIOSVersion)")
+
         // Generate Package.swift content
         let packageContent = PackageGenerator.generatePackageSwift(
             from: metadata,
             fileManager: fileManager,
             resolvedDependencies: resolvedDependencies,
-            resolvedPluginDependencies: resolvedPluginDependencies
+            resolvedPluginDependencies: resolvedPluginDependencies,
+            minimumIOSVersion: minimumIOSVersion
         )
 
         // Validate generated content

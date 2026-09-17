@@ -38,7 +38,7 @@ import PackageDescription
 
 let package = Package(
     name: "com.example.myplugin",
-    platforms: [.iOS(.v14)],
+    platforms: [.iOS(.v15)],
     products: [
         .library(name: "com.example.myplugin", targets: ["com.example.myplugin"])
     ],
@@ -96,6 +96,7 @@ mabs13-plugin-update path/to/plugin.xml
 | Flag | Description |
 | --- | --- |
 | `--auto-resolve` | Automatically convert CocoaPods dependencies to SPM equivalents |
+| `--min-ios <version>` | Minimum iOS version for the generated `Package.swift` (defaults to `15.0`) |
 | `--dry-run` | Preview changes without modifying files |
 | `--force` | Skip all confirmation prompts |
 | `--verbose` | Enable detailed logging output |

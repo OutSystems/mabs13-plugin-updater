@@ -8,13 +8,15 @@ public class PackageGenerator {
     ///   - sourcePath: Fallback path when no native sources are declared (defaults to "src/ios")
     ///   - fileManager: FileSystemManager for filesystem-based header detection (fallback)
     ///   - resolvedDependencies: Optional array of resolved dependencies (for auto-resolution)
+    ///   - minimumIOSVersion: Minimum iOS version for the `platforms:` block
     /// - Returns: Complete Package.swift content as string
     public static func generatePackageSwift(
         from metadata: PluginMetadata,
         sourcePath: String = "src/ios",
         fileManager: FileSystemManager? = nil,
         resolvedDependencies: [ResolvedDependency]? = nil,
-        resolvedPluginDependencies: [ResolvedPluginDependency]? = nil
+        resolvedPluginDependencies: [ResolvedPluginDependency]? = nil,
+        minimumIOSVersion: IOSPlatformVersion = .mabs13Minimum
     )
         -> String {
         let packageName = metadata.packageName
@@ -47,7 +49,7 @@ public class PackageGenerator {
         
         let package = Package(
             name: "\(packageName)",
-            platforms: [.iOS(.v14)],
+            platforms: [\(minimumIOSVersion.spmCode)],
             products: [
                 .library(
                     name: "\(packageName)",

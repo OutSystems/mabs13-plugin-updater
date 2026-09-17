@@ -35,8 +35,20 @@ struct PluginUpdateCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Automatically resolve CocoaPods to SPM dependencies")
     var autoResolve = false
 
+    @Option(
+        name: .long,
+        help: "Minimum iOS version for the generated Package.swift (defaults to 15.0, the MABS 13 floor)"
+    )
+    var minIos: String?
+
     @Argument(help: "Path to plugin.xml file (defaults to ./plugin.xml)")
     var pluginXmlPath: String?
+
+    func validate() throws {
+        if let minIos, IOSPlatformVersion(minIos) == nil {
+            throw ValidationError("Invalid --min-ios value '\(minIos)'. Use a version such as 15.0 or 16.4.")
+        }
+    }
 
     func run() async throws {
         let options = ConversionOptions(
@@ -46,7 +58,8 @@ struct PluginUpdateCommand: AsyncParsableCommand {
             noGitignore: noGitignore,
             backup: backup,
             autoResolve: autoResolve,
-            inputPath: pluginXmlPath
+            inputPath: pluginXmlPath,
+            minimumIOSVersion: minIos.flatMap { IOSPlatformVersion($0) }
         )
 
         let converter = CordovaToSPMConverter(options: options)
