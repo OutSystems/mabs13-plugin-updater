@@ -89,6 +89,9 @@ mabs13-plugin-update
 # Update, resolving CocoaPods dependencies to SPM automatically
 mabs13-plugin-update --auto-resolve
 
+# Update, then check the generated package actually builds for iOS
+mabs13-plugin-update --auto-resolve --verify
+
 # Preview changes without writing files
 mabs13-plugin-update --dry-run --verbose
 
@@ -102,6 +105,7 @@ mabs13-plugin-update path/to/plugin.xml
 | --- | --- |
 | `--auto-resolve` | Automatically convert CocoaPods dependencies to SPM equivalents |
 | `--min-ios <version>` | Minimum iOS version for the generated `Package.swift` (defaults to `15.0`) |
+| `--verify` | Load the generated manifest and build the package for iOS (needs Xcode) |
 | `--dry-run` | Preview changes without modifying files |
 | `--force` | Skip all confirmation prompts |
 | `--verbose` | Enable detailed logging output |

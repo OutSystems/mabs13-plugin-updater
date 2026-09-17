@@ -6,14 +6,16 @@ public class CordovaToSPMConverter {
     private let fileManager: FileSystemManager
     private let userInteraction: UserInteraction
     private let gitignoreManager: GitignoreManager
+    private let verifier: PackageVerifier
     private let options: ConversionOptions
 
-    public init(options: ConversionOptions) {
+    public init(options: ConversionOptions, commandRunner: CommandRunning = ProcessCommandRunner()) {
         self.options = options
         logger = Logger(verbose: options.verbose)
         fileManager = FileSystemManager(logger: logger, dryRun: options.dryRun)
         userInteraction = UserInteraction(force: options.force, logger: logger)
         gitignoreManager = GitignoreManager(fileManager: fileManager, logger: logger)
+        verifier = PackageVerifier(logger: logger, runner: commandRunner)
     }
 
     /// Run the complete conversion process
@@ -65,7 +67,8 @@ public class CordovaToSPMConverter {
                 resolvedPluginDependencies: resolvedPluginDeps
             )
 
-            return true
+            // Step 8: Verify the generated package builds, if requested
+            return verifyIfRequested(metadata, in: pluginXMLPath.directoryPath)
 
         } catch let error as XMLParsingError {
             logger.error("XML parsing failed: \(error.localizedDescription)")
@@ -80,6 +83,43 @@ public class CordovaToSPMConverter {
     }
 
     // MARK: - Private Methods
+
+    /// Run the verification steps when `--verify` was passed, reporting each one.
+    /// - Returns: False when a step failed, so the command exits non-zero.
+    private func verifyIfRequested(_ metadata: PluginMetadata, in pluginDirectory: String) -> Bool {
+        guard options.verify else { return true }
+
+        guard !options.dryRun else {
+            logger.info("Skipping verification: nothing was written in dry-run mode")
+            return true
+        }
+
+        let report = verifier.verify(packageDirectory: pluginDirectory, productName: metadata.packageName)
+
+        for step in report.steps {
+            switch step.outcome {
+            case .passed:
+                logger.success("\(step.name): passed")
+            case let .skipped(reason):
+                logger.warn("\(step.name): skipped, \(reason)")
+            case let .failed(output):
+                logger.error("\(step.name): failed — \(step.command)")
+                logger.error(output.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+
+        if report.succeeded {
+            logger.success("The generated package was verified.")
+        } else {
+            userInteraction.printImportantMessage("""
+            Verification failed:
+            The generated package does not build as it stands. Fix the errors above before
+            handing the plugin to a MABS 13 build.
+            """)
+        }
+
+        return report.succeeded
+    }
 
     private func parsePluginXML(at path: String) throws -> PluginMetadata {
         guard fileManager.fileExists(at: path) else {

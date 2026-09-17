@@ -12,6 +12,8 @@ public struct ConversionOptions {
     /// Explicit minimum iOS version for the generated manifest. Nil means the tool decides:
     /// the MABS 13 floor, raised when the plugin's own declarations or dependencies demand more.
     public let minimumIOSVersion: IOSPlatformVersion?
+    /// Load the generated manifest and build the package for iOS once the conversion is done
+    public let verify: Bool
 
     public init(
         force: Bool = false,
@@ -21,7 +23,8 @@ public struct ConversionOptions {
         backup: Bool = false,
         autoResolve: Bool = false,
         inputPath: String? = nil,
-        minimumIOSVersion: IOSPlatformVersion? = nil
+        minimumIOSVersion: IOSPlatformVersion? = nil,
+        verify: Bool = false
     ) {
         self.force = force
         self.dryRun = dryRun
@@ -31,6 +34,7 @@ public struct ConversionOptions {
         self.autoResolve = autoResolve
         self.inputPath = inputPath
         self.minimumIOSVersion = minimumIOSVersion
+        self.verify = verify
     }
 }
 
