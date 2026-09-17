@@ -50,7 +50,7 @@ final class ConverterSourceDirectoryTests: XCTestCase {
         let swiftFile = sourceDirectory.appendingPathComponent("MonorepoPlugin.swift")
         try """
         import Foundation
-
+        
         @objc(MonorepoPlugin)
         class MonorepoPlugin: CDVPlugin {
         }

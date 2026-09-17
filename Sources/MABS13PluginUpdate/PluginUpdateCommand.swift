@@ -11,7 +11,7 @@ struct PluginUpdateCommand: AsyncParsableCommand {
         rather than through CocoaPods. This tool generates the Package.swift a Cordova \
         plugin needs and makes the matching changes to plugin.xml, leaving the plugin's \
         existing CocoaPods build path intact so it still builds on earlier MABS versions.
-
+        
         No action is needed for Capacitor plugins.
         """,
         version: "1.3.0"

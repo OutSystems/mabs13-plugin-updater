@@ -267,13 +267,13 @@ public class XMLParser {
 
 // MARK: - plugin.xml Rewriting
 
-extension XMLParser {
+public extension XMLParser {
     /// Generate updated plugin.xml content with iOS platform package attribute
     /// - Parameters:
     ///   - metadata: Original plugin metadata
     ///   - addNospmAttribute: Whether to add nospm="true" attribute to pod elements (default: true)
     /// - Returns: Updated XML content with package="swift" for iOS platform and nospm attributes
-    public static func generateUpdatedXML(from metadata: PluginMetadata, addNospmAttribute: Bool = true) -> String {
+    static func generateUpdatedXML(from metadata: PluginMetadata, addNospmAttribute: Bool = true) -> String {
         var updatedContent = metadata.originalXmlContent
 
         // First: Always ensure iOS platform has package="swift" attribute

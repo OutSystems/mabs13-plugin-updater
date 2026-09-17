@@ -48,7 +48,7 @@ final class SwiftImportManagerSourceDirectoryTests: XCTestCase {
     private var pluginSource: String {
         """
         import Foundation
-
+        
         @objc(OSFilePlugin)
         class OSFilePlugin: CDVPlugin {
         }

@@ -72,7 +72,7 @@ final class SwiftImportManagerFoundationTests: XCTestCase {
     func testAddsFoundationImportAlongsideOtherImports() throws {
         let updated = try process("""
         import IONFilesystemLib
-
+        
         struct Converter {
             let timestamp: Date
         }
@@ -90,7 +90,7 @@ final class SwiftImportManagerFoundationTests: XCTestCase {
         let updated = try process("""
         // Copyright (c) 2026 Example Corp.
         // Licensed under the MIT License.
-
+        
         struct Converter {
             let url: URL
         }
@@ -107,7 +107,7 @@ final class SwiftImportManagerFoundationTests: XCTestCase {
     func testLeavesFileWithFoundationImportUnchanged() throws {
         let content = """
         import Foundation
-
+        
         struct Converter {
             let payload: Data
         }
@@ -120,7 +120,7 @@ final class SwiftImportManagerFoundationTests: XCTestCase {
         // UIKit re-exports Foundation, so Data resolves without an explicit import
         let content = """
         import UIKit
-
+        
         struct Converter {
             let payload: Data
         }
@@ -143,7 +143,7 @@ final class SwiftImportManagerFoundationTests: XCTestCase {
         // PluginResultData contains "Data" but is not a Foundation type
         let content = """
         typealias PluginResultData = [String: Any]
-
+        
         enum PluginStatus {
             case success(payload: PluginResultData)
         }
@@ -188,7 +188,7 @@ final class SwiftImportManagerFoundationTests: XCTestCase {
     func testTestableImportDoesNotCountAsFoundationImport() throws {
         let updated = try process("""
         @testable import MyPlugin
-
+        
         struct Converter {
             let payload: Data
         }

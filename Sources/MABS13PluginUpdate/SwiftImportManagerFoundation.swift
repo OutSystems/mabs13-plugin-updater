@@ -6,7 +6,7 @@ import Foundation
 /// gets implicitly from the app target's bridging header.
 extension SwiftImportManager {
     /// Modules that make Foundation's types available, by being Foundation or by re-exporting it.
-    static let foundationProvidingModules: Set<String> = ["Foundation", "UIKit", "SwiftUI", "AppKit"]
+    static let foundationProvidingModules: Set = ["Foundation", "UIKit", "SwiftUI", "AppKit"]
 
     /// Foundation types a plugin's Swift sources commonly rely on. `NS`-prefixed types are matched
     /// by pattern, since they all come from Foundation or from a framework that re-exports it.

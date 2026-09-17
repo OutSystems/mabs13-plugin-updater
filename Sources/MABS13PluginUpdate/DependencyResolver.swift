@@ -207,7 +207,6 @@ public class DependencyResolver {
             status: .resolved
         )
     }
-
 }
 
 // MARK: - SPM Dependency Construction

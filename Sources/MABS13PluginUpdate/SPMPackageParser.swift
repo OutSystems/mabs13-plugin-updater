@@ -49,8 +49,7 @@ public class SPMPackageParser {
     /// the `.iOS("16.4")` form. Returns nil when the package declares no iOS platform.
     func extractIOSPlatform(_ content: String) -> IOSPlatformVersion? {
         guard let platformsSection = extractSection(from: content, sectionName: "platforms"),
-              let raw = extractFirstCaptureGroup(from: platformsSection, pattern: #"\.iOS\(\s*([^)]+?)\s*\)"#)
-        else {
+              let raw = extractFirstCaptureGroup(from: platformsSection, pattern: #"\.iOS\(\s*([^)]+?)\s*\)"#) else {
             return nil
         }
         return IOSPlatformVersion(raw)

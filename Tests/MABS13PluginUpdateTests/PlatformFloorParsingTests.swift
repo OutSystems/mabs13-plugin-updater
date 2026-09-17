@@ -20,7 +20,7 @@ final class PlatformFloorParsingTests: XCTestCase {
         let content = """
         // swift-tools-version: 5.9
         import PackageDescription
-
+        
         let package = Package(
             name: "IONFilesystemLib",
             platforms: [.iOS(.v15)],
