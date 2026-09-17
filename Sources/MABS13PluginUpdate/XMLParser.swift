@@ -69,7 +69,8 @@ public class XMLParser {
             systemLibraries: accumulator.systemLibraries,
             headerPaths: accumulator.headerPaths,
             pluginDependencies: pluginDependencies,
-            resources: accumulator.resources
+            resources: accumulator.resources,
+            deploymentTarget: accumulator.deploymentTarget
         )
     }
 
@@ -82,6 +83,7 @@ public class XMLParser {
         var systemLibraries: [SystemLibrary] = []
         var headerPaths: [String] = []
         var resources: [ResourceFile] = []
+        var deploymentTarget: IOSPlatformVersion?
     }
 
     private static func accumulate(
@@ -120,6 +122,26 @@ public class XMLParser {
         for resource in parseResourceFiles(from: platform) where !acc.resources.contains(resource) {
             acc.resources.append(resource)
         }
+        if let target = parseDeploymentTarget(from: platform) {
+            acc.deploymentTarget = [acc.deploymentTarget, target].compactMap { $0 }.max()
+        }
+    }
+
+    /// Read the iOS deployment target the plugin asks for. Cordova plugins declare it as a
+    /// `deployment-target` or `IPHONEOS_DEPLOYMENT_TARGET` preference, either directly under the
+    /// iOS platform or inside a `<config-file>` it contributes, with the value in `value` or
+    /// `default`.
+    private static func parseDeploymentTarget(from platform: XMLIndexer) -> IOSPlatformVersion? {
+        let names = ["deployment-target", "iphoneos-deployment-target", "IPHONEOS_DEPLOYMENT_TARGET"]
+        let candidates = platform["preference"].all + platform["config-file"]["preference"].all
+        return candidates.compactMap { preference -> IOSPlatformVersion? in
+            guard let name = preference.element?.attribute(by: "name")?.text,
+                  names.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) else { return nil }
+            let raw = preference.element?.attribute(by: "value")?.text
+                ?? preference.element?.attribute(by: "default")?.text
+            return raw.flatMap { IOSPlatformVersion($0) }
+        }
+        .max()
     }
 
     /// Collect Cordova variable preferences (name → default value).

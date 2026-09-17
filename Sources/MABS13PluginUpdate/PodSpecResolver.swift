@@ -197,16 +197,18 @@ public class PodSpecResolver {
             
             // Extract and determine source type
             let sourceType = extractSourceType(from: json, podName: name)
-            
+            let iosDeploymentTarget = extractIOSDeploymentTarget(from: json)
+
             let sourceDesc = sourceType.description
             logger.debug("Parsed pod spec for \(name): version=\(extractedVersion), sourceType=\(sourceDesc)")
-            
+
             return PodSpecInfo(
                 name: name,
                 version: extractedVersion,
                 sourceType: sourceType,
                 homepage: homepage,
-                vendoredFrameworks: vendoredFrameworks
+                vendoredFrameworks: vendoredFrameworks,
+                iosDeploymentTarget: iosDeploymentTarget
             )
             
         } catch {
@@ -214,6 +216,20 @@ public class PodSpecResolver {
         }
     }
     
+    /// Read `platforms.ios` from a podspec, the deployment target the pod itself requires.
+    /// Accepts the string form CocoaPods emits (`"15.0"`) and a bare number.
+    func extractIOSDeploymentTarget(from json: [String: Any]) -> IOSPlatformVersion? {
+        guard let platforms = json["platforms"] as? [String: Any] else { return nil }
+        switch platforms["ios"] {
+        case let value as String:
+            return IOSPlatformVersion(value)
+        case let value as NSNumber:
+            return IOSPlatformVersion(value.stringValue)
+        default:
+            return nil
+        }
+    }
+
     private func extractSourceType(from json: [String: Any], podName: String) -> PodSourceType {
         guard let source = json["source"] as? [String: Any] else {
             logger.debug("No source found in podspec for \(podName)")

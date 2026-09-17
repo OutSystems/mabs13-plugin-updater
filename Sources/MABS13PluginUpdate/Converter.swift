@@ -232,8 +232,11 @@ extension CordovaToSPMConverter {
             ? await resolveAllDependencies(from: metadata)
             : (nil, nil)
 
-        let minimumIOSVersion = options.minimumIOSVersion ?? .mabs13Minimum
-        logger.info("Minimum iOS version for the generated manifest: \(minimumIOSVersion)")
+        let minimumIOSVersion = decideMinimumIOSVersion(
+            metadata: metadata,
+            resolvedDependencies: resolvedDependencies,
+            resolvedPluginDependencies: resolvedPluginDependencies
+        )
 
         // Generate Package.swift content
         let packageContent = PackageGenerator.generatePackageSwift(
@@ -262,6 +265,35 @@ extension CordovaToSPMConverter {
             resolvedPods: resolvedDependencies,
             resolvedPlugins: resolvedPluginDependencies
         )
+    }
+
+    /// Resolve the manifest's iOS floor and log how it was reached.
+    private func decideMinimumIOSVersion(
+        metadata: PluginMetadata,
+        resolvedDependencies: [ResolvedDependency]?,
+        resolvedPluginDependencies: [ResolvedPluginDependency]?
+    )
+        -> IOSPlatformVersion {
+        let platform = IOSPlatformResolver.resolve(
+            metadata: metadata,
+            resolvedDependencies: resolvedDependencies,
+            resolvedPluginDependencies: resolvedPluginDependencies,
+            requested: options.minimumIOSVersion
+        )
+
+        logger.info("Minimum iOS version for the generated manifest: \(platform.version)")
+        for reason in platform.reasons {
+            logger.debug("  \(reason)")
+        }
+
+        if let requested = platform.overriddenRequest {
+            logger.warn(
+                "--min-ios asked for iOS \(requested), but iOS \(platform.version) is required: " +
+                    platform.reasons.joined(separator: "; ")
+            )
+        }
+
+        return platform.version
     }
 
     private func updateGitignoreIfRequested(in directory: String) {
