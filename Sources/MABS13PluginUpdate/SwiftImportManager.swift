@@ -2,7 +2,7 @@ import Foundation
 
 /// Manages adding Cordova imports to Swift source files
 public class SwiftImportManager {
-    private let logger: Logger
+    let logger: Logger
     private let fileManager: FileSystemManager
     
     public init(logger: Logger, fileManager: FileSystemManager) {
@@ -104,33 +104,40 @@ public class SwiftImportManager {
     }
     
     private func processSingleSwiftFile(at filePath: String) -> Bool {
+        let fileName = URL(fileURLWithPath: filePath).lastPathComponent
         do {
-            let content = try String(contentsOfFile: filePath, encoding: .utf8)
-            
-            // Check if file already has Cordova import
-            if hasExistingCordovaImport(content) {
-                logger.debug("File already has Cordova import: \(URL(fileURLWithPath: filePath).lastPathComponent)")
-                return true
-            }
-            
-            // Check if file needs Cordova import (contains Cordova-related code)
-            if !needsCordovaImport(content) {
-                logger.debug("File doesn't need Cordova import: \(URL(fileURLWithPath: filePath).lastPathComponent)")
-                return true
-            }
-            
-            let updatedContent = addConditionalCordovaImport(to: content)
-            
+            let originalContent = try String(contentsOfFile: filePath, encoding: .utf8)
+            var content = addFoundationImportIfNeeded(to: originalContent, fileName: fileName)
+            content = addCordovaImportIfNeeded(to: content, fileName: fileName)
+
+            guard content != originalContent else { return true }
+
             // Use FileSystemManager to handle dry-run logic
-            try fileManager.writeFile(content: updatedContent, to: filePath, createDirectories: false)
-            
+            try fileManager.writeFile(content: content, to: filePath, createDirectories: false)
+
             return true
         } catch {
             logger.error("Failed to process Swift file \(filePath): \(error.localizedDescription)")
             return false
         }
     }
-    
+
+    private func addCordovaImportIfNeeded(to content: String, fileName: String) -> String {
+        // Check if file already has Cordova import
+        if hasExistingCordovaImport(content) {
+            logger.debug("File already has Cordova import: \(fileName)")
+            return content
+        }
+
+        // Check if file needs Cordova import (contains Cordova-related code)
+        guard needsCordovaImport(content) else {
+            logger.debug("File doesn't need Cordova import: \(fileName)")
+            return content
+        }
+
+        return addConditionalCordovaImport(to: content)
+    }
+
     private func hasExistingCordovaImport(_ content: String) -> Bool {
         let lines = content.components(separatedBy: .newlines)
         
@@ -186,54 +193,6 @@ public class SwiftImportManager {
     }
     
     private func addConditionalCordovaImport(to content: String) -> String {
-        let lines = content.components(separatedBy: .newlines)
-        var newLines: [String] = []
-        var foundFirstImport = false
-        var importAdded = false
-        
-        for line in lines {
-            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-            
-            // If this is an import line and we haven't added our import yet
-            if trimmedLine.hasPrefix("import "), !foundFirstImport {
-                foundFirstImport = true
-                
-                // Add the conditional Cordova import before the first existing import
-                newLines.append("#if canImport(Cordova)")
-                newLines.append("import Cordova")
-                newLines.append("#endif")
-                newLines.append("")
-                importAdded = true
-            }
-            
-            newLines.append(line)
-        }
-        
-        // If no imports were found, add after any initial comment/license block
-        if !importAdded {
-            // Default: append at the end (handles files that are entirely comments)
-            var insertIndex = lines.count
-
-            // Find the first line that is not a comment or blank — insert before it
-            for (index, line) in lines.enumerated() {
-                let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-                if !trimmedLine.isEmpty,
-                   !trimmedLine.hasPrefix("//"),
-                   !trimmedLine.hasPrefix("/*"),
-                   !trimmedLine.hasPrefix("*") {
-                    insertIndex = index
-                    break
-                }
-            }
-
-            newLines = Array(lines[0 ..< insertIndex])
-            newLines.append("#if canImport(Cordova)")
-            newLines.append("import Cordova")
-            newLines.append("#endif")
-            newLines.append("")
-            newLines.append(contentsOf: lines[insertIndex...])
-        }
-        
-        return newLines.joined(separator: "\n")
+        inserting(["#if canImport(Cordova)", "import Cordova", "#endif", ""], into: content)
     }
 }
