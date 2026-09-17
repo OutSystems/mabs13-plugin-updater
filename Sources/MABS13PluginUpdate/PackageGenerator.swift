@@ -32,8 +32,9 @@ public class PackageGenerator {
             : metadataHeadersPath
         let linkerSettings = metadata.systemFrameworks.map { LinkerSetting.linkedFramework($0.name) }
             + metadata.systemLibraries.map { LinkerSetting.linkedLibrary($0.name) }
+        let targetName = metadata.targetName
         let targetsContent = buildTargetsContent(
-            targetName: packageName,
+            targetName: targetName,
             localFrameworks: metadata.localFrameworks,
             targetDependenciesString: targetDepsString,
             sourcePath: layout.path,
@@ -53,7 +54,7 @@ public class PackageGenerator {
             products: [
                 .library(
                     name: "\(packageName)",
-                    targets: ["\(packageName)"])
+                    targets: ["\(targetName)"])
             ],
             dependencies: [
         \(packageDepsString)

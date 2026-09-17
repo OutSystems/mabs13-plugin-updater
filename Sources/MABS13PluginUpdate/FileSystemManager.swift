@@ -337,4 +337,12 @@ extension String {
     func appendingPathComponent(_ component: String) -> String {
         (self as NSString).appendingPathComponent(component)
     }
+
+    /// The string reduced to characters valid in a Swift identifier, or an empty string when
+    /// nothing usable remains (including a name that would start with a digit).
+    var sanitizedSwiftIdentifier: String {
+        let allowed = filter { $0.isLetter || $0.isNumber || $0 == "_" }
+        guard let first = allowed.first, first.isLetter || first == "_" else { return "" }
+        return allowed
+    }
 }

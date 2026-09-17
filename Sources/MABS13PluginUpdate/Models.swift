@@ -327,6 +327,8 @@ public struct PluginMetadata: Equatable {
     /// iOS deployment target the plugin itself asks for, from a `deployment-target` or
     /// `IPHONEOS_DEPLOYMENT_TARGET` preference in the iOS platform
     public let deploymentTarget: IOSPlatformVersion?
+    /// The plugin's iOS class, from `<param name="ios-package">` or the `<feature>` name
+    public let iosPackageClass: String?
 
     public init(
         pluginId: String,
@@ -340,7 +342,8 @@ public struct PluginMetadata: Equatable {
         headerPaths: [String] = [],
         pluginDependencies: [CordovaPluginDependency] = [],
         resources: [ResourceFile] = [],
-        deploymentTarget: IOSPlatformVersion? = nil
+        deploymentTarget: IOSPlatformVersion? = nil,
+        iosPackageClass: String? = nil
     ) {
         self.pluginId = pluginId
         self.dependencies = dependencies
@@ -354,11 +357,25 @@ public struct PluginMetadata: Equatable {
         self.pluginDependencies = pluginDependencies
         self.resources = resources
         self.deploymentTarget = deploymentTarget
+        self.iosPackageClass = iosPackageClass
     }
 
     /// Package name derived from plugin ID
     public var packageName: String {
         pluginId.isEmpty ? "UnknownPlugin" : pluginId
+    }
+
+    /// Name for the SPM target.
+    ///
+    /// The package and the product keep the plugin id, which is how Cordova iOS 8 references the
+    /// plugin, but a target name becomes a Swift module name — and a plugin id is dotted, so SwiftPM
+    /// has to mangle it. When plugin.xml declares the plugin's iOS class, that name is used instead,
+    /// which is also the convention the hand-written plugin manifests follow.
+    public var targetName: String {
+        guard let candidate = iosPackageClass?.sanitizedSwiftIdentifier, !candidate.isEmpty else {
+            return packageName
+        }
+        return candidate
     }
 
     /// Whether this plugin has any CocoaPods dependencies

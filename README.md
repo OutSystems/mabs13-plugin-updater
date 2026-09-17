@@ -22,6 +22,11 @@ If your plugin is a **Capacitor** plugin, it is unaffected and you do not need t
 ```xml
 <plugin id="com.example.myplugin" version="1.0.0">
     <platform name="ios">
+        <config-file parent="/*" target="config.xml">
+            <feature name="MyPlugin">
+                <param name="ios-package" value="MyPlugin"/>
+            </feature>
+        </config-file>
         <podspec>
             <pods>
                 <pod name="Alamofire" spec="~> 5.0"/>
@@ -40,7 +45,7 @@ let package = Package(
     name: "com.example.myplugin",
     platforms: [.iOS(.v15)],
     products: [
-        .library(name: "com.example.myplugin", targets: ["com.example.myplugin"])
+        .library(name: "com.example.myplugin", targets: ["MyPlugin"])
     ],
     dependencies: [
         .package(url: "https://github.com/apache/cordova-ios.git", branch: "master"),
@@ -48,7 +53,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "com.example.myplugin",
+            name: "MyPlugin",
             dependencies: [
                 .product(name: "Cordova", package: "cordova-ios"),
                 .product(name: "Alamofire", package: "Alamofire")

@@ -70,7 +70,8 @@ public class XMLParser {
             headerPaths: accumulator.headerPaths,
             pluginDependencies: pluginDependencies,
             resources: accumulator.resources,
-            deploymentTarget: accumulator.deploymentTarget
+            deploymentTarget: accumulator.deploymentTarget,
+            iosPackageClass: accumulator.iosPackageClass
         )
     }
 
@@ -84,6 +85,7 @@ public class XMLParser {
         var headerPaths: [String] = []
         var resources: [ResourceFile] = []
         var deploymentTarget: IOSPlatformVersion?
+        var iosPackageClass: String?
     }
 
     private static func accumulate(
@@ -125,6 +127,25 @@ public class XMLParser {
         if let target = parseDeploymentTarget(from: platform) {
             acc.deploymentTarget = [acc.deploymentTarget, target].compactMap { $0 }.max()
         }
+        if acc.iosPackageClass == nil {
+            acc.iosPackageClass = parseIOSPackageClass(from: platform)
+        }
+    }
+
+    /// The plugin's iOS class, declared as `<param name="ios-package" value="OSFilePlugin"/>` in the
+    /// `<feature>` the plugin contributes to config.xml, with the feature's own name as a fallback.
+    /// This is the name Cordova instantiates, and the natural name for the SPM target's module.
+    private static func parseIOSPackageClass(from platform: XMLIndexer) -> String? {
+        let features = platform["feature"].all + platform["config-file"]["feature"].all
+        for feature in features {
+            let param = feature["param"].all.first {
+                $0.element?.attribute(by: "name")?.text == "ios-package"
+            }
+            if let value = param?.element?.attribute(by: "value")?.text, !value.isEmpty {
+                return value
+            }
+        }
+        return features.compactMap { $0.element?.attribute(by: "name")?.text }.first { !$0.isEmpty }
     }
 
     /// Read the iOS deployment target the plugin asks for. Cordova plugins declare it as a
