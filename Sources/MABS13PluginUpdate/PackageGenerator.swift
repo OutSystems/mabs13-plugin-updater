@@ -72,6 +72,12 @@ public class PackageGenerator {
         resolvedPluginDependencies: [ResolvedPluginDependency]?
     )
         -> (packageDeps: String, targetDeps: String) {
+        // cordova-ios is tracked by branch on purpose: this is the dependency Apache's own plugin
+        // documentation prescribes for a Cordova iOS 8 plugin manifest, and a generated manifest
+        // should match the reference one. Pinning is not an option in the usual sense either, since
+        // the repository's tags (rel/8.1.1) are not semantic versions, so a version requirement
+        // cannot resolve them and only `.revision("rel/…")` would work.
+        // https://cordova.apache.org/docs/en/latest/guide/platforms/ios/plugin.html
         var packageDependencies = [
             "        .package(url: \"https://github.com/apache/cordova-ios.git\", branch: \"master\")"
         ]
