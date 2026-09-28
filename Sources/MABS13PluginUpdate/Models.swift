@@ -329,6 +329,11 @@ public struct PluginMetadata: Equatable {
     public let deploymentTarget: IOSPlatformVersion?
     /// The plugin's iOS class, from `<param name="ios-package">` or the `<feature>` name
     public let iosPackageClass: String?
+    /// Whether plugin.xml declares a `<platform name="ios">` at all. Everything this tool produces
+    /// is iOS-only, so a plugin without one has nothing to convert. Defaults to true because only
+    /// the parser can observe its absence; metadata built by hand is assumed to describe a plugin
+    /// that has an iOS platform.
+    public let hasIOSPlatform: Bool
 
     public init(
         pluginId: String,
@@ -343,7 +348,8 @@ public struct PluginMetadata: Equatable {
         pluginDependencies: [CordovaPluginDependency] = [],
         resources: [ResourceFile] = [],
         deploymentTarget: IOSPlatformVersion? = nil,
-        iosPackageClass: String? = nil
+        iosPackageClass: String? = nil,
+        hasIOSPlatform: Bool = true
     ) {
         self.pluginId = pluginId
         self.dependencies = dependencies
@@ -358,6 +364,7 @@ public struct PluginMetadata: Equatable {
         self.resources = resources
         self.deploymentTarget = deploymentTarget
         self.iosPackageClass = iosPackageClass
+        self.hasIOSPlatform = hasIOSPlatform
     }
 
     /// Package name derived from plugin ID

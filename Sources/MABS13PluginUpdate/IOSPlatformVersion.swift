@@ -5,10 +5,22 @@ public struct IOSPlatformVersion: Equatable, Comparable, CustomStringConvertible
     public let major: Int
     public let minor: Int
 
-    /// The lowest deployment target MABS 13 accepts. Xcode 26 and later reject anything below
-    /// iOS 15 during project validation, before any source file is compiled, so a generated
-    /// manifest must never declare less than this.
-    public static let mabs13Minimum = IOSPlatformVersion(major: 15, minor: 0)
+    /// The lowest deployment target a generated package can declare. Xcode 27, the toolchain
+    /// MABS 13 builds with, rejects a Swift package below iOS 15 during validation, before any
+    /// source file is compiled. Xcode 26 applies the same rule to applications but not to
+    /// packages, which is why MABS 12 never hit this.
+    ///
+    /// This is deliberately the toolchain floor and not ``mabs13AppDeploymentTarget``: iOS 15
+    /// still resolves under MABS 12.1 ODC, where a Cordova build can be asked for a Swift package
+    /// with `spmPreview: true`.
+    public static let toolchainMinimum = IOSPlatformVersion(major: 15, minor: 0)
+
+    /// The deployment target MABS 13 applications are built with. A package that demands more
+    /// than this will not compile into an unmodified MABS 13 app, so the generator warns when the
+    /// resolved floor goes above it. It does not cap: the demand comes from a real dependency, and
+    /// capping would only produce a manifest that cannot resolve. A plugin can also raise the
+    /// application's own target through a Cordova hook, in which case the warning is noise.
+    public static let mabs13AppDeploymentTarget = IOSPlatformVersion(major: 16, minor: 0)
 
     public init(major: Int, minor: Int = 0) {
         self.major = major

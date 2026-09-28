@@ -16,7 +16,7 @@ public class PackageGenerator {
         fileManager: FileSystemManager? = nil,
         resolvedDependencies: [ResolvedDependency]? = nil,
         resolvedPluginDependencies: [ResolvedPluginDependency]? = nil,
-        minimumIOSVersion: IOSPlatformVersion = .mabs13Minimum
+        minimumIOSVersion: IOSPlatformVersion = .toolchainMinimum
     )
         -> String {
         let packageName = metadata.packageName

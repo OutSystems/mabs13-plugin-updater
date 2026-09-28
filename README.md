@@ -16,6 +16,29 @@ If your plugin is a **Capacitor** plugin, it is unaffected and you do not need t
 
 > **Note:** This is an independent project. It is not affiliated with, endorsed by, or sponsored by The Apache Software Foundation. See [Trademarks](#trademarks).
 
+## Scope
+
+This tool automates one mechanical part of a MABS 13 upgrade: making the plugin's iOS code buildable as a Swift package.
+
+**In scope**
+
+- Generating `Package.swift` from the dependencies declared in `<podspec>`
+- Choosing the manifest's minimum iOS version from what the plugin and its dependencies require
+- The corresponding `plugin.xml` changes (`package="swift"`, `nospm="true"`)
+- Adding `#if canImport(Cordova)` guards so sources still compile on older MABS versions
+- Adding `import Foundation` to sources that relied on the app target's bridging header for it
+- `.gitignore` entries for SPM build artifacts
+- With `--verify`, checking that the generated package loads and compiles for iOS
+
+**Out of scope**
+
+- **Breaking changes in your native source.** Cordova iOS 8 changes and removes platform APIs. The tool does not read your Objective-C or Swift for uses of them, and will not tell you about them.
+- **Proving the plugin works.** `--verify` compiles the generated package; it does not run the plugin. You still need to build it into an app on MABS 13 and exercise it.
+- **Dependencies with no SPM equivalent.** `--auto-resolve` leaves these as `// TODO:` comments for you to resolve by hand.
+- **Android.** The tool touches the iOS platform only. A plugin whose `plugin.xml` declares no `<platform name="ios">` is refused before anything is written, since it needs no change for MABS 13.
+
+Treat a successful run as the starting point for the upgrade, not the end of it.
+
 ## Example
 
 **Input — `plugin.xml`**
@@ -135,13 +158,21 @@ If a dependency cannot be resolved automatically, it is added as a `// TODO:` co
 
 The generated `platforms:` entry is the highest of:
 
-- iOS 15, the MABS 13 floor — Xcode 26 and later reject anything lower
+- iOS 15, the lowest a Swift package can declare. Xcode 27, the toolchain MABS 13 builds with,
+  rejects anything below it during validation. (Xcode 26 applies the same rule to applications but
+  not to packages, which is why this did not affect MABS 12.)
 - a `deployment-target` or `IPHONEOS_DEPLOYMENT_TARGET` preference in the plugin's iOS platform
 - the minimum declared by each resolved dependency (with `--auto-resolve`)
 - `--min-ios`, when given
 
 Run with `--verbose` to see which of these set the version. A `--min-ios` lower than what is
 required is raised, with a warning.
+
+Nothing here lowers the result, including `--min-ios`. A dependency that requires more than a
+MABS 13 application's own deployment target (iOS 16) still sets the manifest's floor, and the tool
+warns instead of capping: capping would emit a manifest that cannot resolve, and the application's
+target can itself be raised from a Cordova hook. If you see that warning and no hook raises the
+target, the dependency version is the thing to change.
 
 ## Trademarks
 

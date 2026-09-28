@@ -7,6 +7,7 @@ public enum XMLParsingError: Error, LocalizedError {
     case invalidXML(String)
     case missingPluginId
     case parsingFailed(String)
+    case noIOSPlatform(String)
 
     public var errorDescription: String? {
         switch self {
@@ -18,6 +19,10 @@ public enum XMLParsingError: Error, LocalizedError {
             "Plugin XML is missing required 'id' attribute"
         case let .parsingFailed(reason):
             "Failed to parse XML: \(reason)"
+        case let .noIOSPlatform(pluginId):
+            "'\(pluginId)' declares no <platform name=\"ios\"> in plugin.xml. This tool only " +
+                "converts a plugin's iOS code to a Swift package, so there is nothing for it to " +
+                "do here. A plugin with no iOS platform needs no change for MABS 13."
         }
     }
 }
@@ -51,10 +56,12 @@ public class XMLParser {
         let pluginPreferences = collectPreferences(from: xml["plugin"])
         let pluginDependencies = parseCordovaPluginDependencies(from: xml["plugin"])
         var accumulator = IOSPlatformAccumulator()
+        var hasIOSPlatform = false
 
         for platform in xml["plugin"]["platform"].all {
             guard let platformName = platform.element?.attribute(by: "name")?.text,
                   platformName.lowercased() == "ios" else { continue }
+            hasIOSPlatform = true
             accumulate(platform: platform, into: &accumulator, pluginPreferences: pluginPreferences)
         }
 
@@ -71,7 +78,8 @@ public class XMLParser {
             pluginDependencies: pluginDependencies,
             resources: accumulator.resources,
             deploymentTarget: accumulator.deploymentTarget,
-            iosPackageClass: accumulator.iosPackageClass
+            iosPackageClass: accumulator.iosPackageClass,
+            hasIOSPlatform: hasIOSPlatform
         )
     }
 

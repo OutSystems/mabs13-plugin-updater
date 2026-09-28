@@ -9,8 +9,8 @@ public struct ConversionOptions {
     public let backup: Bool
     public let autoResolve: Bool
     public let inputPath: String?
-    /// Explicit minimum iOS version for the generated manifest. Nil means the tool decides:
-    /// the MABS 13 floor, raised when the plugin's own declarations or dependencies demand more.
+    /// Explicit minimum iOS version for the generated manifest. Nil means the tool decides: the
+    /// toolchain floor, raised when the plugin's own declarations or dependencies demand more.
     public let minimumIOSVersion: IOSPlatformVersion?
     /// Load the generated manifest and build the package for iOS once the conversion is done
     public let verify: Bool

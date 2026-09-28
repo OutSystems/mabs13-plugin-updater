@@ -2,12 +2,14 @@ import Foundation
 
 /// Main converter class that orchestrates the entire conversion process
 public class CordovaToSPMConverter {
-    private let logger: Logger
+    // Internal rather than private so the parts of the conversion that live in their own file,
+    // such as the platform floor in ConverterPlatform.swift, can still log and read the options.
+    let logger: Logger
+    let options: ConversionOptions
     private let fileManager: FileSystemManager
     private let userInteraction: UserInteraction
     private let gitignoreManager: GitignoreManager
     private let verifier: PackageVerifier
-    private let options: ConversionOptions
 
     public init(options: ConversionOptions, commandRunner: CommandRunning = ProcessCommandRunner()) {
         self.options = options
@@ -126,7 +128,15 @@ public class CordovaToSPMConverter {
             throw XMLParsingError.fileNotFound(path)
         }
 
-        return try XMLParser.parsePluginXML(at: path)
+        let metadata = try XMLParser.parsePluginXML(at: path)
+
+        // Everything below this point writes iOS-only output, so stop before touching anything
+        // rather than leaving an Android-only plugin with a Package.swift it cannot use.
+        guard metadata.hasIOSPlatform else {
+            throw XMLParsingError.noIOSPlatform(metadata.pluginId)
+        }
+
+        return metadata
     }
 }
 
@@ -305,35 +315,6 @@ extension CordovaToSPMConverter {
             resolvedPods: resolvedDependencies,
             resolvedPlugins: resolvedPluginDependencies
         )
-    }
-
-    /// Resolve the manifest's iOS floor and log how it was reached.
-    private func decideMinimumIOSVersion(
-        metadata: PluginMetadata,
-        resolvedDependencies: [ResolvedDependency]?,
-        resolvedPluginDependencies: [ResolvedPluginDependency]?
-    )
-        -> IOSPlatformVersion {
-        let platform = IOSPlatformResolver.resolve(
-            metadata: metadata,
-            resolvedDependencies: resolvedDependencies,
-            resolvedPluginDependencies: resolvedPluginDependencies,
-            requested: options.minimumIOSVersion
-        )
-
-        logger.info("Minimum iOS version for the generated manifest: \(platform.version)")
-        for reason in platform.reasons {
-            logger.debug("  \(reason)")
-        }
-
-        if let requested = platform.overriddenRequest {
-            logger.warn(
-                "--min-ios asked for iOS \(requested), but iOS \(platform.version) is required: " +
-                    platform.reasons.joined(separator: "; ")
-            )
-        }
-
-        return platform.version
     }
 
     private func updateGitignoreIfRequested(in directory: String) {

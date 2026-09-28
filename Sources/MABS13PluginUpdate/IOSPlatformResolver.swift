@@ -14,14 +14,22 @@ public struct IOSPlatformDecision: Equatable {
         self.reasons = reasons
         self.overriddenRequest = overriddenRequest
     }
+
+    /// True when the chosen version is above the deployment target MABS 13 applications are built
+    /// with, so an unmodified MABS 13 app will refuse to compile against the generated package.
+    /// Worth a warning rather than an error: the version was demanded by something real, and a
+    /// Cordova hook can raise the application's target.
+    public var exceedsMABS13AppDeploymentTarget: Bool {
+        version > .mabs13AppDeploymentTarget
+    }
 }
 
 /// Decides the `platforms: [.iOS(...)]` entry of a generated manifest.
 ///
-/// A plugin cannot build with a deployment target lower than any of its dependencies', and MABS 13
-/// itself has a floor, so the answer is the highest of everything known: the MABS 13 minimum, what
-/// the plugin declares in plugin.xml, what each resolved dependency declares, and an explicit
-/// request from `--min-ios`.
+/// A plugin cannot build with a deployment target lower than any of its dependencies', and the
+/// toolchain itself has a floor, so the answer is the highest of everything known: the toolchain
+/// minimum, what the plugin declares in plugin.xml, what each resolved dependency declares, and an
+/// explicit request from `--min-ios`. Nothing lowers the result, including `--min-ios`.
 public enum IOSPlatformResolver {
     public static func resolve(
         metadata: PluginMetadata,
@@ -31,7 +39,11 @@ public enum IOSPlatformResolver {
     )
         -> IOSPlatformDecision {
         var candidates: [(version: IOSPlatformVersion, reason: String)] = [
-            (.mabs13Minimum, "MABS 13 requires iOS \(IOSPlatformVersion.mabs13Minimum) or later")
+            (
+                .toolchainMinimum,
+                "MABS 13 builds with Xcode 27, which rejects a package below " +
+                    "iOS \(IOSPlatformVersion.toolchainMinimum)"
+            )
         ]
 
         if let requested {
@@ -52,7 +64,7 @@ public enum IOSPlatformResolver {
             candidates.append((floor, "\(dependency.original.id) requires iOS \(floor) or later"))
         }
 
-        let version = candidates.map(\.version).max() ?? .mabs13Minimum
+        let version = candidates.map(\.version).max() ?? .toolchainMinimum
         let reasons = candidates.filter { $0.version == version }.map(\.reason)
         let overriddenRequest = requested.flatMap { $0 < version ? $0 : nil }
 

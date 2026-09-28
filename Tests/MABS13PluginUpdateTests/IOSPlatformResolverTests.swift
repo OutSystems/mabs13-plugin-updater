@@ -30,12 +30,12 @@ final class IOSPlatformResolverTests: XCTestCase {
         )
     }
 
-    func testFallsBackToMABS13Floor() {
+    func testFallsBackToTheToolchainFloor() {
         let decision = IOSPlatformResolver.resolve(metadata: makeMetadata())
 
-        XCTAssertEqual(decision.version, .mabs13Minimum)
+        XCTAssertEqual(decision.version, .toolchainMinimum)
         XCTAssertEqual(decision.reasons.count, 1)
-        XCTAssertTrue(decision.reasons[0].contains("MABS 13"))
+        XCTAssertTrue(decision.reasons[0].contains("Xcode 27"))
         XCTAssertNil(decision.overriddenRequest)
     }
 
@@ -59,7 +59,7 @@ final class IOSPlatformResolverTests: XCTestCase {
             ]
         )
 
-        XCTAssertEqual(decision.version, .mabs13Minimum)
+        XCTAssertEqual(decision.version, .toolchainMinimum)
     }
 
     func testHighestDependencyFloorWins() {
@@ -129,7 +129,7 @@ final class IOSPlatformResolverTests: XCTestCase {
             requested: IOSPlatformVersion(major: 14)
         )
 
-        XCTAssertEqual(decision.version, .mabs13Minimum)
+        XCTAssertEqual(decision.version, .toolchainMinimum)
         XCTAssertEqual(decision.overriddenRequest, IOSPlatformVersion(major: 14))
     }
 
@@ -144,5 +144,55 @@ final class IOSPlatformResolverTests: XCTestCase {
 
         XCTAssertEqual(decision.version, IOSPlatformVersion(major: 16))
         XCTAssertEqual(decision.reasons.count, 3)
+    }
+
+    func testTheToolchainFloorIsBelowTheMABS13ApplicationTarget() {
+        // Arrange / Act
+        let decision = IOSPlatformResolver.resolve(metadata: makeMetadata())
+
+        // Assert
+        XCTAssertEqual(decision.version, .toolchainMinimum)
+        XCTAssertFalse(decision.exceedsMABS13AppDeploymentTarget)
+    }
+
+    func testTheMABS13ApplicationTargetItselfIsNotFlagged() {
+        // Arrange / Act
+        let decision = IOSPlatformResolver.resolve(
+            metadata: makeMetadata(deploymentTarget: .mabs13AppDeploymentTarget)
+        )
+
+        // Assert
+        XCTAssertEqual(decision.version, .mabs13AppDeploymentTarget)
+        XCTAssertFalse(decision.exceedsMABS13AppDeploymentTarget)
+    }
+
+    func testADependencyAboveTheMABS13ApplicationTargetIsFlagged() {
+        // Arrange
+        let demandingPod = makeResolvedPod(
+            name: "DemandingLib",
+            minimumIOSVersion: IOSPlatformVersion(major: 17)
+        )
+
+        // Act
+        let decision = IOSPlatformResolver.resolve(
+            metadata: makeMetadata(),
+            resolvedDependencies: [demandingPod]
+        )
+
+        // Assert: flagged, but not capped — the version a dependency demands is still the one used
+        XCTAssertEqual(decision.version, IOSPlatformVersion(major: 17))
+        XCTAssertTrue(decision.exceedsMABS13AppDeploymentTarget)
+        XCTAssertEqual(decision.reasons, ["DemandingLib requires iOS 17.0 or later"])
+    }
+
+    func testAMinorVersionAboveTheMABS13ApplicationTargetIsFlagged() {
+        // Arrange / Act
+        let decision = IOSPlatformResolver.resolve(
+            metadata: makeMetadata(deploymentTarget: IOSPlatformVersion(major: 16, minor: 4))
+        )
+
+        // Assert
+        XCTAssertEqual(decision.version, IOSPlatformVersion(major: 16, minor: 4))
+        XCTAssertTrue(decision.exceedsMABS13AppDeploymentTarget)
     }
 }

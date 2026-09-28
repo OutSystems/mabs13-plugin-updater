@@ -40,7 +40,7 @@ struct PluginUpdateCommand: AsyncParsableCommand {
 
     @Option(
         name: .long,
-        help: "Minimum iOS version for the generated Package.swift (defaults to 15.0, the MABS 13 floor)"
+        help: "Minimum iOS version for the generated Package.swift (defaults to 15.0, the lowest Xcode 27 accepts)"
     )
     var minIos: String?
 

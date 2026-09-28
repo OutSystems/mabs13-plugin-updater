@@ -2,9 +2,14 @@ import XCTest
 @testable import MABS13PluginUpdate
 
 final class IOSPlatformVersionTests: XCTestCase {
-    func testMABS13MinimumIsIOS15() {
-        XCTAssertEqual(IOSPlatformVersion.mabs13Minimum, IOSPlatformVersion(major: 15, minor: 0))
-        XCTAssertEqual(IOSPlatformVersion.mabs13Minimum.spmCode, ".iOS(.v15)")
+    func testToolchainMinimumIsIOS15() {
+        XCTAssertEqual(IOSPlatformVersion.toolchainMinimum, IOSPlatformVersion(major: 15, minor: 0))
+        XCTAssertEqual(IOSPlatformVersion.toolchainMinimum.spmCode, ".iOS(.v15)")
+    }
+
+    func testMABS13AppDeploymentTargetIsIOS16AndAboveTheToolchainFloor() {
+        XCTAssertEqual(IOSPlatformVersion.mabs13AppDeploymentTarget, IOSPlatformVersion(major: 16, minor: 0))
+        XCTAssertGreaterThan(IOSPlatformVersion.mabs13AppDeploymentTarget, .toolchainMinimum)
     }
 
     func testParsePlainVersions() {
