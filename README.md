@@ -2,9 +2,12 @@
 
 [![CI](https://github.com/OutSystems/mabs13-plugin-updater/actions/workflows/ci.yml/badge.svg)](https://github.com/OutSystems/mabs13-plugin-updater/actions/workflows/ci.yml)
 
-Updates Cordova plugins to Cordova iOS 8 for MABS 13 compatibility. **No action is needed for Capacitor plugins.**
+Adds Swift Package Manager packaging to Cordova plugins so their iOS code builds under Cordova iOS 8 / MABS 13. **No action is needed for Capacitor plugins.**
 
 Maintained by OutSystems.
+
+> [!IMPORTANT]
+> Despite the name, this is not a complete MABS 13 upgrade. It handles the SPM packaging change only — it does not review your plugin's native source for breaking changes introduced by Cordova iOS 8, and it does not verify that the result runs: `--verify` only checks that the package compiles. See [Scope](#scope).
 
 ## Do you need this?
 
