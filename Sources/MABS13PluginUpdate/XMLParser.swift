@@ -7,6 +7,7 @@ public enum XMLParsingError: Error, LocalizedError {
     case invalidXML(String)
     case missingPluginId
     case parsingFailed(String)
+    case noIOSPlatform(String)
 
     public var errorDescription: String? {
         switch self {
@@ -18,6 +19,10 @@ public enum XMLParsingError: Error, LocalizedError {
             "Plugin XML is missing required 'id' attribute"
         case let .parsingFailed(reason):
             "Failed to parse XML: \(reason)"
+        case let .noIOSPlatform(pluginId):
+            "'\(pluginId)' declares no <platform name=\"ios\"> in plugin.xml. This tool only " +
+                "converts a plugin's iOS code to a Swift package, so there is nothing for it to " +
+                "do here. A plugin with no iOS platform needs no change for MABS 13."
         }
     }
 }
@@ -51,10 +56,12 @@ public class XMLParser {
         let pluginPreferences = collectPreferences(from: xml["plugin"])
         let pluginDependencies = parseCordovaPluginDependencies(from: xml["plugin"])
         var accumulator = IOSPlatformAccumulator()
+        var hasIOSPlatform = false
 
         for platform in xml["plugin"]["platform"].all {
             guard let platformName = platform.element?.attribute(by: "name")?.text,
                   platformName.lowercased() == "ios" else { continue }
+            hasIOSPlatform = true
             accumulate(platform: platform, into: &accumulator, pluginPreferences: pluginPreferences)
         }
 
@@ -69,7 +76,10 @@ public class XMLParser {
             systemLibraries: accumulator.systemLibraries,
             headerPaths: accumulator.headerPaths,
             pluginDependencies: pluginDependencies,
-            resources: accumulator.resources
+            resources: accumulator.resources,
+            deploymentTarget: accumulator.deploymentTarget,
+            iosPackageClass: accumulator.iosPackageClass,
+            hasIOSPlatform: hasIOSPlatform
         )
     }
 
@@ -82,6 +92,8 @@ public class XMLParser {
         var systemLibraries: [SystemLibrary] = []
         var headerPaths: [String] = []
         var resources: [ResourceFile] = []
+        var deploymentTarget: IOSPlatformVersion?
+        var iosPackageClass: String?
     }
 
     private static func accumulate(
@@ -120,6 +132,45 @@ public class XMLParser {
         for resource in parseResourceFiles(from: platform) where !acc.resources.contains(resource) {
             acc.resources.append(resource)
         }
+        if let target = parseDeploymentTarget(from: platform) {
+            acc.deploymentTarget = [acc.deploymentTarget, target].compactMap { $0 }.max()
+        }
+        if acc.iosPackageClass == nil {
+            acc.iosPackageClass = parseIOSPackageClass(from: platform)
+        }
+    }
+
+    /// The plugin's iOS class, declared as `<param name="ios-package" value="OSFilePlugin"/>` in the
+    /// `<feature>` the plugin contributes to config.xml, with the feature's own name as a fallback.
+    /// This is the name Cordova instantiates, and the natural name for the SPM target's module.
+    private static func parseIOSPackageClass(from platform: XMLIndexer) -> String? {
+        let features = platform["feature"].all + platform["config-file"]["feature"].all
+        for feature in features {
+            let param = feature["param"].all.first {
+                $0.element?.attribute(by: "name")?.text == "ios-package"
+            }
+            if let value = param?.element?.attribute(by: "value")?.text, !value.isEmpty {
+                return value
+            }
+        }
+        return features.compactMap { $0.element?.attribute(by: "name")?.text }.first { !$0.isEmpty }
+    }
+
+    /// Read the iOS deployment target the plugin asks for. Cordova plugins declare it as a
+    /// `deployment-target` or `IPHONEOS_DEPLOYMENT_TARGET` preference, either directly under the
+    /// iOS platform or inside a `<config-file>` it contributes, with the value in `value` or
+    /// `default`.
+    private static func parseDeploymentTarget(from platform: XMLIndexer) -> IOSPlatformVersion? {
+        let names = ["deployment-target", "iphoneos-deployment-target", "IPHONEOS_DEPLOYMENT_TARGET"]
+        let candidates = platform["preference"].all + platform["config-file"]["preference"].all
+        return candidates.compactMap { preference -> IOSPlatformVersion? in
+            guard let name = preference.element?.attribute(by: "name")?.text,
+                  names.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) else { return nil }
+            let raw = preference.element?.attribute(by: "value")?.text
+                ?? preference.element?.attribute(by: "default")?.text
+            return raw.flatMap { IOSPlatformVersion($0) }
+        }
+        .max()
     }
 
     /// Collect Cordova variable preferences (name → default value).
@@ -224,13 +275,13 @@ public class XMLParser {
 
 // MARK: - plugin.xml Rewriting
 
-extension XMLParser {
+public extension XMLParser {
     /// Generate updated plugin.xml content with iOS platform package attribute
     /// - Parameters:
     ///   - metadata: Original plugin metadata
     ///   - addNospmAttribute: Whether to add nospm="true" attribute to pod elements (default: true)
     /// - Returns: Updated XML content with package="swift" for iOS platform and nospm attributes
-    public static func generateUpdatedXML(from metadata: PluginMetadata, addNospmAttribute: Bool = true) -> String {
+    static func generateUpdatedXML(from metadata: PluginMetadata, addNospmAttribute: Bool = true) -> String {
         var updatedContent = metadata.originalXmlContent
 
         // First: Always ensure iOS platform has package="swift" attribute

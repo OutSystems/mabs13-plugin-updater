@@ -34,13 +34,25 @@ public class SPMPackageParser {
         let dependencies = extractDependencies(content)
         let products = extractProducts(content)
         let targets = extractTargets(content)
-        
+        let iosPlatform = extractIOSPlatform(content)
+
         return SPMPackageInfo(
             name: packageName,
             dependencies: dependencies,
             products: products,
-            targets: targets
+            targets: targets,
+            iosPlatform: iosPlatform
         )
+    }
+
+    /// Extract the minimum iOS version from a `platforms:` block, in either the `.iOS(.v15)` or
+    /// the `.iOS("16.4")` form. Returns nil when the package declares no iOS platform.
+    func extractIOSPlatform(_ content: String) -> IOSPlatformVersion? {
+        guard let platformsSection = extractSection(from: content, sectionName: "platforms"),
+              let raw = extractFirstCaptureGroup(from: platformsSection, pattern: #"\.iOS\(\s*([^)]+?)\s*\)"#) else {
+            return nil
+        }
+        return IOSPlatformVersion(raw)
     }
     
     private func extractPackageName(_ content: String) -> String? {

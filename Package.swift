@@ -1,9 +1,9 @@
 // swift-tools-version:5.9
 import PackageDescription
 
-// The executable product name is the command users type; the target name is the Swift
-// module name, so it must be a valid identifier (SwiftPM would otherwise mangle the
-// hyphens to underscores when deriving the module name from the target name).
+/// The executable product name is the command users type; the target name is the Swift
+/// module name, so it must be a valid identifier (SwiftPM would otherwise mangle the
+/// hyphens to underscores when deriving the module name from the target name).
 let package = Package(
     name: "mabs13-plugin-update",
     platforms: [.macOS(.v13)],
@@ -30,7 +30,11 @@ let package = Package(
         ),
         .testTarget(
             name: "MABS13PluginUpdateTests",
-            dependencies: ["MABS13PluginUpdate"],
+            dependencies: [
+                "MABS13PluginUpdate",
+                // Needed to exercise the command's own option parsing and validation
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ],
             path: "Tests/MABS13PluginUpdateTests"
         )
     ]

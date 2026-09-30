@@ -8,13 +8,15 @@ public class PackageGenerator {
     ///   - sourcePath: Fallback path when no native sources are declared (defaults to "src/ios")
     ///   - fileManager: FileSystemManager for filesystem-based header detection (fallback)
     ///   - resolvedDependencies: Optional array of resolved dependencies (for auto-resolution)
+    ///   - minimumIOSVersion: Minimum iOS version for the `platforms:` block
     /// - Returns: Complete Package.swift content as string
     public static func generatePackageSwift(
         from metadata: PluginMetadata,
         sourcePath: String = "src/ios",
         fileManager: FileSystemManager? = nil,
         resolvedDependencies: [ResolvedDependency]? = nil,
-        resolvedPluginDependencies: [ResolvedPluginDependency]? = nil
+        resolvedPluginDependencies: [ResolvedPluginDependency]? = nil,
+        minimumIOSVersion: IOSPlatformVersion = .toolchainMinimum
     )
         -> String {
         let packageName = metadata.packageName
@@ -30,8 +32,9 @@ public class PackageGenerator {
             : metadataHeadersPath
         let linkerSettings = metadata.systemFrameworks.map { LinkerSetting.linkedFramework($0.name) }
             + metadata.systemLibraries.map { LinkerSetting.linkedLibrary($0.name) }
+        let targetName = metadata.targetName
         let targetsContent = buildTargetsContent(
-            targetName: packageName,
+            targetName: targetName,
             localFrameworks: metadata.localFrameworks,
             targetDependenciesString: targetDepsString,
             sourcePath: layout.path,
@@ -47,11 +50,11 @@ public class PackageGenerator {
         
         let package = Package(
             name: "\(packageName)",
-            platforms: [.iOS(.v14)],
+            platforms: [\(minimumIOSVersion.spmCode)],
             products: [
                 .library(
                     name: "\(packageName)",
-                    targets: ["\(packageName)"])
+                    targets: ["\(targetName)"])
             ],
             dependencies: [
         \(packageDepsString)
@@ -69,6 +72,12 @@ public class PackageGenerator {
         resolvedPluginDependencies: [ResolvedPluginDependency]?
     )
         -> (packageDeps: String, targetDeps: String) {
+        // cordova-ios is tracked by branch on purpose: this is the dependency Apache's own plugin
+        // documentation prescribes for a Cordova iOS 8 plugin manifest, and a generated manifest
+        // should match the reference one. Pinning is not an option in the usual sense either, since
+        // the repository's tags (rel/8.1.1) are not semantic versions, so a version requirement
+        // cannot resolve them and only `.revision("rel/…")` would work.
+        // https://cordova.apache.org/docs/en/latest/guide/platforms/ios/plugin.html
         var packageDependencies = [
             "        .package(url: \"https://github.com/apache/cordova-ios.git\", branch: \"master\")"
         ]

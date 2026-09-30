@@ -11,7 +11,7 @@ struct PluginUpdateCommand: AsyncParsableCommand {
         rather than through CocoaPods. This tool generates the Package.swift a Cordova \
         plugin needs and makes the matching changes to plugin.xml, leaving the plugin's \
         existing CocoaPods build path intact so it still builds on earlier MABS versions.
-
+        
         No action is needed for Capacitor plugins.
         """,
         version: "1.3.0"
@@ -35,8 +35,23 @@ struct PluginUpdateCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Automatically resolve CocoaPods to SPM dependencies")
     var autoResolve = false
 
+    @Flag(name: .long, help: "Load the generated manifest and build the package for iOS (needs Xcode)")
+    var verify = false
+
+    @Option(
+        name: .long,
+        help: "Minimum iOS version for the generated Package.swift (defaults to 15.0, the lowest Xcode 27 accepts)"
+    )
+    var minIos: String?
+
     @Argument(help: "Path to plugin.xml file (defaults to ./plugin.xml)")
     var pluginXmlPath: String?
+
+    func validate() throws {
+        if let minIos, IOSPlatformVersion(minIos) == nil {
+            throw ValidationError("Invalid --min-ios value '\(minIos)'. Use a version such as 15.0 or 16.4.")
+        }
+    }
 
     func run() async throws {
         let options = ConversionOptions(
@@ -46,7 +61,9 @@ struct PluginUpdateCommand: AsyncParsableCommand {
             noGitignore: noGitignore,
             backup: backup,
             autoResolve: autoResolve,
-            inputPath: pluginXmlPath
+            inputPath: pluginXmlPath,
+            minimumIOSVersion: minIos.flatMap { IOSPlatformVersion($0) },
+            verify: verify
         )
 
         let converter = CordovaToSPMConverter(options: options)

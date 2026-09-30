@@ -2,18 +2,22 @@ import Foundation
 
 /// Main converter class that orchestrates the entire conversion process
 public class CordovaToSPMConverter {
-    private let logger: Logger
+    // Internal rather than private so the parts of the conversion that live in their own file,
+    // such as the platform floor in ConverterPlatform.swift, can still log and read the options.
+    let logger: Logger
+    let options: ConversionOptions
     private let fileManager: FileSystemManager
     private let userInteraction: UserInteraction
     private let gitignoreManager: GitignoreManager
-    private let options: ConversionOptions
+    private let verifier: PackageVerifier
 
-    public init(options: ConversionOptions) {
+    public init(options: ConversionOptions, commandRunner: CommandRunning = ProcessCommandRunner()) {
         self.options = options
         logger = Logger(verbose: options.verbose)
         fileManager = FileSystemManager(logger: logger, dryRun: options.dryRun)
         userInteraction = UserInteraction(force: options.force, logger: logger)
         gitignoreManager = GitignoreManager(fileManager: fileManager, logger: logger)
+        verifier = PackageVerifier(logger: logger, runner: commandRunner)
     }
 
     /// Run the complete conversion process
@@ -47,7 +51,9 @@ public class CordovaToSPMConverter {
             let xmlUpdateResult = try updatePluginXMLIfNeeded(metadata, at: pluginXMLPath)
 
             // Step 5: Add conditional Cordova imports to Swift files
-            _ = addCordovaImportsToSwiftFiles(in: pluginXMLPath.directoryPath)
+            if !addCordovaImportsToSwiftFiles(metadata, in: pluginXMLPath.directoryPath) {
+                logger.warn("Some Swift files could not be updated with the conditional Cordova import")
+            }
 
             // Step 6: Update .gitignore if requested (after plugin.xml update)
             if !options.noGitignore {
@@ -63,7 +69,8 @@ public class CordovaToSPMConverter {
                 resolvedPluginDependencies: resolvedPluginDeps
             )
 
-            return true
+            // Step 8: Verify the generated package builds, if requested
+            return verifyIfRequested(metadata, in: pluginXMLPath.directoryPath)
 
         } catch let error as XMLParsingError {
             logger.error("XML parsing failed: \(error.localizedDescription)")
@@ -79,12 +86,57 @@ public class CordovaToSPMConverter {
 
     // MARK: - Private Methods
 
+    /// Run the verification steps when `--verify` was passed, reporting each one.
+    /// - Returns: False when a step failed, so the command exits non-zero.
+    private func verifyIfRequested(_ metadata: PluginMetadata, in pluginDirectory: String) -> Bool {
+        guard options.verify else { return true }
+
+        guard !options.dryRun else {
+            logger.info("Skipping verification: nothing was written in dry-run mode")
+            return true
+        }
+
+        let report = verifier.verify(packageDirectory: pluginDirectory, productName: metadata.packageName)
+
+        for step in report.steps {
+            switch step.outcome {
+            case .passed:
+                logger.success("\(step.name): passed")
+            case let .skipped(reason):
+                logger.warn("\(step.name): skipped, \(reason)")
+            case let .failed(output):
+                logger.error("\(step.name): failed — \(step.command)")
+                logger.error(output.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+
+        if report.succeeded {
+            logger.success("The generated package was verified.")
+        } else {
+            userInteraction.printImportantMessage("""
+            Verification failed:
+            The generated package does not build as it stands. Fix the errors above before
+            handing the plugin to a MABS 13 build.
+            """)
+        }
+
+        return report.succeeded
+    }
+
     private func parsePluginXML(at path: String) throws -> PluginMetadata {
         guard fileManager.fileExists(at: path) else {
             throw XMLParsingError.fileNotFound(path)
         }
 
-        return try XMLParser.parsePluginXML(at: path)
+        let metadata = try XMLParser.parsePluginXML(at: path)
+
+        // Everything below this point writes iOS-only output, so stop before touching anything
+        // rather than leaving an Android-only plugin with a Package.swift it cannot use.
+        guard metadata.hasIOSPlatform else {
+            throw XMLParsingError.noIOSPlatform(metadata.pluginId)
+        }
+
+        return metadata
     }
 }
 
@@ -230,12 +282,19 @@ extension CordovaToSPMConverter {
             ? await resolveAllDependencies(from: metadata)
             : (nil, nil)
 
+        let minimumIOSVersion = decideMinimumIOSVersion(
+            metadata: metadata,
+            resolvedDependencies: resolvedDependencies,
+            resolvedPluginDependencies: resolvedPluginDependencies
+        )
+
         // Generate Package.swift content
         let packageContent = PackageGenerator.generatePackageSwift(
             from: metadata,
             fileManager: fileManager,
             resolvedDependencies: resolvedDependencies,
-            resolvedPluginDependencies: resolvedPluginDependencies
+            resolvedPluginDependencies: resolvedPluginDependencies,
+            minimumIOSVersion: minimumIOSVersion
         )
 
         // Validate generated content
@@ -396,11 +455,16 @@ extension CordovaToSPMConverter {
         }
     }
     
-    /// Add conditional Cordova imports to Swift files in src/ios directory
-    /// - Parameter pluginDirectory: The root directory of the plugin
+    /// Add conditional Cordova imports to the Swift files of the plugin's declared iOS sources,
+    /// falling back to `src/ios` when the plugin declares no `<source-file>` for iOS.
+    /// - Parameters:
+    ///   - metadata: Parsed plugin metadata, used to locate the iOS sources
+    ///   - pluginDirectory: The root directory of the plugin
     /// - Returns: True if successful, false otherwise
-    private func addCordovaImportsToSwiftFiles(in pluginDirectory: String) -> Bool {
+    private func addCordovaImportsToSwiftFiles(_ metadata: PluginMetadata, in pluginDirectory: String) -> Bool {
+        let declaredDirectories = metadata.nativeSourceDirectories
+        let sourceDirectories = declaredDirectories.isEmpty ? ["src/ios"] : declaredDirectories
         let swiftImportManager = SwiftImportManager(logger: logger, fileManager: fileManager)
-        return swiftImportManager.addCordovaImports(in: pluginDirectory)
+        return swiftImportManager.addCordovaImports(in: pluginDirectory, sourceDirectories: sourceDirectories)
     }
 }

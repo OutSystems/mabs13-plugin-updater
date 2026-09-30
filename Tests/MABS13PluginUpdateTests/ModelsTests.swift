@@ -106,4 +106,31 @@ final class ModelsTests: XCTestCase {
         XCTAssertTrue(options.noGitignore)
         XCTAssertEqual(options.inputPath, "/custom/path")
     }
+
+    func testNativeSourceDirectoriesAreUniqueAndOrdered() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.plugin",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: "",
+            nativeSources: [
+                NativeSourceFile(path: "packages/cordova-plugin/ios/OSFilePlugin.swift"),
+                NativeSourceFile(path: "packages/cordova-plugin/ios/OSFileError.swift"),
+                NativeSourceFile(path: "src/ios/legacy/Helper.m")
+            ]
+        )
+
+        XCTAssertEqual(metadata.nativeSourceDirectories, ["packages/cordova-plugin/ios", "src/ios/legacy"])
+    }
+
+    func testNativeSourceDirectoriesIsEmptyWithoutDeclarations() {
+        let metadata = PluginMetadata(
+            pluginId: "com.example.plugin",
+            dependencies: [],
+            hasPodspec: false,
+            originalXmlContent: ""
+        )
+
+        XCTAssertTrue(metadata.nativeSourceDirectories.isEmpty)
+    }
 }

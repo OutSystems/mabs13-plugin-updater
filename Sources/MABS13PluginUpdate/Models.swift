@@ -62,19 +62,23 @@ public struct PodSpecInfo: Equatable {
     public let sourceType: PodSourceType
     public let homepage: String?
     public let vendoredFrameworks: String?
+    /// iOS deployment target declared by the podspec (`platforms.ios`), when it declares one
+    public let iosDeploymentTarget: IOSPlatformVersion?
 
     public init(
         name: String,
         version: String,
         sourceType: PodSourceType,
         homepage: String? = nil,
-        vendoredFrameworks: String? = nil
+        vendoredFrameworks: String? = nil,
+        iosDeploymentTarget: IOSPlatformVersion? = nil
     ) {
         self.name = name
         self.version = version
         self.sourceType = sourceType
         self.homepage = homepage
         self.vendoredFrameworks = vendoredFrameworks
+        self.iosDeploymentTarget = iosDeploymentTarget
     }
 }
 
@@ -174,111 +178,6 @@ public struct LocalXCFramework: Equatable, Codable {
     public init(name: String, path: String) {
         self.name = name
         self.path = path
-    }
-}
-
-// MARK: - Swift Package Manager Models
-
-/// Represents different types of SPM dependency requirements
-public enum SPMRequirement: Equatable {
-    case exact(String)
-    case from(String)
-    case upToNextMajor(String)
-    case upToNextMinor(String)
-    case branch(String)
-    case tag(String)
-    
-    public var description: String {
-        switch self {
-        case let .exact(version):
-            "exact: \"\(version)\""
-        case let .from(version):
-            "from: \"\(version)\""
-        case let .upToNextMajor(version):
-            ".upToNextMajor(from: \"\(version)\")"
-        case let .upToNextMinor(version):
-            ".upToNextMinor(from: \"\(version)\")"
-        case let .branch(branch):
-            "branch: \"\(branch)\""
-        case let .tag(tag):
-            "exact: \"\(tag)\""
-        }
-    }
-}
-
-/// Represents a resolved Swift Package Manager dependency
-public struct SPMDependency: Equatable {
-    public let url: String
-    public let requirement: SPMRequirement
-    /// Product name to use in target dependencies (e.g. "Alamofire")
-    public let productName: String?
-    /// Package name as declared in the dependency's Package.swift `name:` field.
-    /// Used for the `package:` label in `.product(name:package:)`.
-    /// Falls back to the repository name extracted from the URL when nil.
-    public let packageName: String?
-
-    public init(url: String, requirement: SPMRequirement, productName: String? = nil, packageName: String? = nil) {
-        self.url = url
-        self.requirement = requirement
-        self.productName = productName
-        self.packageName = packageName
-    }
-}
-
-/// Represents package information extracted from a Package.swift file
-public struct SPMPackageInfo: Equatable {
-    public let name: String
-    public let dependencies: [SPMDependency]
-    public let products: [SPMProduct]
-    public let targets: [SPMTarget]
-    
-    public init(
-        name: String,
-        dependencies: [SPMDependency] = [],
-        products: [SPMProduct] = [],
-        targets: [SPMTarget] = []
-    ) {
-        self.name = name
-        self.dependencies = dependencies
-        self.products = products
-        self.targets = targets
-    }
-}
-
-/// Types of SPM products
-public enum SPMProductType: Equatable {
-    case library
-    case executable
-    
-    public var description: String {
-        switch self {
-        case .library: "library"
-        case .executable: "executable"
-        }
-    }
-}
-
-/// Represents a Swift Package Manager product
-public struct SPMProduct: Equatable {
-    public let name: String
-    public let type: SPMProductType
-    public let targets: [String]
-    
-    public init(name: String, type: SPMProductType, targets: [String]) {
-        self.name = name
-        self.type = type
-        self.targets = targets
-    }
-}
-
-/// Represents a Swift Package Manager target
-public struct SPMTarget: Equatable {
-    public let name: String
-    public let dependencies: [String]
-
-    public init(name: String, dependencies: [String] = []) {
-        self.name = name
-        self.dependencies = dependencies
     }
 }
 
@@ -425,6 +324,16 @@ public struct PluginMetadata: Equatable {
     public let pluginDependencies: [CordovaPluginDependency]
     /// Resource files declared via <resource-file> in the iOS platform
     public let resources: [ResourceFile]
+    /// iOS deployment target the plugin itself asks for, from a `deployment-target` or
+    /// `IPHONEOS_DEPLOYMENT_TARGET` preference in the iOS platform
+    public let deploymentTarget: IOSPlatformVersion?
+    /// The plugin's iOS class, from `<param name="ios-package">` or the `<feature>` name
+    public let iosPackageClass: String?
+    /// Whether plugin.xml declares a `<platform name="ios">` at all. Everything this tool produces
+    /// is iOS-only, so a plugin without one has nothing to convert. Defaults to true because only
+    /// the parser can observe its absence; metadata built by hand is assumed to describe a plugin
+    /// that has an iOS platform.
+    public let hasIOSPlatform: Bool
 
     public init(
         pluginId: String,
@@ -437,7 +346,10 @@ public struct PluginMetadata: Equatable {
         systemLibraries: [SystemLibrary] = [],
         headerPaths: [String] = [],
         pluginDependencies: [CordovaPluginDependency] = [],
-        resources: [ResourceFile] = []
+        resources: [ResourceFile] = [],
+        deploymentTarget: IOSPlatformVersion? = nil,
+        iosPackageClass: String? = nil,
+        hasIOSPlatform: Bool = true
     ) {
         self.pluginId = pluginId
         self.dependencies = dependencies
@@ -450,11 +362,27 @@ public struct PluginMetadata: Equatable {
         self.headerPaths = headerPaths
         self.pluginDependencies = pluginDependencies
         self.resources = resources
+        self.deploymentTarget = deploymentTarget
+        self.iosPackageClass = iosPackageClass
+        self.hasIOSPlatform = hasIOSPlatform
     }
 
     /// Package name derived from plugin ID
     public var packageName: String {
         pluginId.isEmpty ? "UnknownPlugin" : pluginId
+    }
+
+    /// Name for the SPM target.
+    ///
+    /// The package and the product keep the plugin id, which is how Cordova iOS 8 references the
+    /// plugin, but a target name becomes a Swift module name — and a plugin id is dotted, so SwiftPM
+    /// has to mangle it. When plugin.xml declares the plugin's iOS class, that name is used instead,
+    /// which is also the convention the hand-written plugin manifests follow.
+    public var targetName: String {
+        guard let candidate = iosPackageClass?.sanitizedSwiftIdentifier, !candidate.isEmpty else {
+            return packageName
+        }
+        return candidate
     }
 
     /// Whether this plugin has any CocoaPods dependencies
@@ -475,6 +403,13 @@ public struct PluginMetadata: Equatable {
     /// Whether this plugin has any native source files declared
     public var hasNativeSources: Bool {
         !nativeSources.isEmpty
+    }
+
+    /// Unique directories holding the plugin's declared native sources, in declaration order.
+    /// These are the directories the tool must scan, which is not necessarily `src/ios`.
+    public var nativeSourceDirectories: [String] {
+        var seen = Set<String>()
+        return nativeSources.map(\.directory).filter { seen.insert($0).inserted }
     }
 
     /// Dependency descriptions for logging

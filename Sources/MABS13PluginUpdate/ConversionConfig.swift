@@ -9,6 +9,11 @@ public struct ConversionOptions {
     public let backup: Bool
     public let autoResolve: Bool
     public let inputPath: String?
+    /// Explicit minimum iOS version for the generated manifest. Nil means the tool decides: the
+    /// toolchain floor, raised when the plugin's own declarations or dependencies demand more.
+    public let minimumIOSVersion: IOSPlatformVersion?
+    /// Load the generated manifest and build the package for iOS once the conversion is done
+    public let verify: Bool
 
     public init(
         force: Bool = false,
@@ -17,7 +22,9 @@ public struct ConversionOptions {
         noGitignore: Bool = false,
         backup: Bool = false,
         autoResolve: Bool = false,
-        inputPath: String? = nil
+        inputPath: String? = nil,
+        minimumIOSVersion: IOSPlatformVersion? = nil,
+        verify: Bool = false
     ) {
         self.force = force
         self.dryRun = dryRun
@@ -26,6 +33,8 @@ public struct ConversionOptions {
         self.backup = backup
         self.autoResolve = autoResolve
         self.inputPath = inputPath
+        self.minimumIOSVersion = minimumIOSVersion
+        self.verify = verify
     }
 }
 

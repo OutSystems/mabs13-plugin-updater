@@ -195,11 +195,36 @@ public class DependencyResolver {
         }
         
         // Step 7: Create SPM dependency
+        return ResolvedDependency(
+            originalPod: dependency,
+            spmDependency: makeSPMDependency(
+                url: url,
+                tag: tag,
+                packageInfo: packageInfo,
+                podSpecInfo: podSpecInfo,
+                dependency: dependency
+            ),
+            status: .resolved
+        )
+    }
+}
+
+// MARK: - SPM Dependency Construction
+
+extension DependencyResolver {
+    private func makeSPMDependency(
+        url: String,
+        tag: String?,
+        packageInfo: SPMPackageInfo,
+        podSpecInfo: PodSpecInfo,
+        dependency: PodDependency
+    )
+        -> SPMDependency {
         let requirement = PodSpecResolver.convertSpecToSPMRequirement(
             dependency.spec,
             sourceTag: tag
         )
-        
+
         // Prefer a product whose name matches the pod name (e.g. FirebaseMessaging inside firebase-ios-sdk),
         // falling back to the first library product, then the package name.
         let podName = dependency.name
@@ -213,18 +238,34 @@ public class DependencyResolver {
             .map { $0.hasSuffix(".git") ? String($0.dropLast(4)) : $0 }
             ?? packageInfo.name
 
-        let spmDependency = SPMDependency(
+        return SPMDependency(
             url: url,
             requirement: requirement,
             productName: productName,
-            packageName: packageName
+            packageName: packageName,
+            minimumIOSVersion: minimumIOSVersion(
+                packageInfo: packageInfo,
+                podSpecInfo: podSpecInfo,
+                podName: podName
+            )
         )
-        
-        return ResolvedDependency(
-            originalPod: dependency,
-            spmDependency: spmDependency,
-            status: .resolved
-        )
+    }
+
+    /// The dependency's own iOS floor: the higher of what its Package.swift and its podspec declare.
+    /// The generated manifest cannot ask for less than this, or resolution fails.
+    private func minimumIOSVersion(
+        packageInfo: SPMPackageInfo,
+        podSpecInfo: PodSpecInfo,
+        podName: String
+    )
+        -> IOSPlatformVersion? {
+        let floor = [packageInfo.iosPlatform, podSpecInfo.iosDeploymentTarget]
+            .compactMap { $0 }
+            .max()
+        if let floor {
+            logger.debug("\(podName) requires iOS \(floor) or later")
+        }
+        return floor
     }
 }
 
@@ -430,7 +471,8 @@ extension DependencyResolver {
             ?? packageInfo.name
 
         let spmDep = SPMDependency(url: url, requirement: requirement,
-                                   productName: productName, packageName: packageName)
+                                   productName: productName, packageName: packageName,
+                                   minimumIOSVersion: packageInfo.iosPlatform)
         logger.debug("\(dependency.id): resolved to \(productName) from \(packageName)")
         return ResolvedPluginDependency(original: dependency, spmDependency: spmDep, status: .resolved)
     }

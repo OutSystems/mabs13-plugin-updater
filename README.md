@@ -7,7 +7,7 @@ Adds Swift Package Manager packaging to Cordova plugins so their iOS code builds
 Maintained by OutSystems.
 
 > [!IMPORTANT]
-> Despite the name, this is not a complete MABS 13 upgrade. It handles the SPM packaging change only — it does not review your plugin's native source for breaking changes introduced by Cordova iOS 8, and it does not verify that the result builds or runs. See [Scope](#scope).
+> Despite the name, this is not a complete MABS 13 upgrade. It handles the SPM packaging change only — it does not review your plugin's native source for breaking changes introduced by Cordova iOS 8, and it does not verify that the result runs: `--verify` only checks that the package compiles. See [Scope](#scope).
 
 ## Do you need this?
 
@@ -26,16 +26,19 @@ This tool automates one mechanical part of a MABS 13 upgrade: making the plugin'
 **In scope**
 
 - Generating `Package.swift` from the dependencies declared in `<podspec>`
+- Choosing the manifest's minimum iOS version from what the plugin and its dependencies require
 - The corresponding `plugin.xml` changes (`package="swift"`, `nospm="true"`)
 - Adding `#if canImport(Cordova)` guards so sources still compile on older MABS versions
+- Adding `import Foundation` to sources that relied on the app target's bridging header for it
 - `.gitignore` entries for SPM build artifacts
+- With `--verify`, checking that the generated package loads and compiles for iOS
 
 **Out of scope**
 
 - **Breaking changes in your native source.** Cordova iOS 8 changes and removes platform APIs. The tool does not read your Objective-C or Swift for uses of them, and will not tell you about them.
-- **Verifying the result.** A generated `Package.swift` is not a passing build. You still need to build the plugin against MABS 13 and exercise it in an app.
+- **Proving the plugin works.** `--verify` compiles the generated package; it does not run the plugin. You still need to build it into an app on MABS 13 and exercise it.
 - **Dependencies with no SPM equivalent.** `--auto-resolve` leaves these as `// TODO:` comments for you to resolve by hand.
-- **Android.** The tool touches the iOS platform only.
+- **Android.** The tool touches the iOS platform only. A plugin whose `plugin.xml` declares no `<platform name="ios">` is refused before anything is written, since it needs no change for MABS 13.
 
 Treat a successful run as the starting point for the upgrade, not the end of it.
 
@@ -45,6 +48,11 @@ Treat a successful run as the starting point for the upgrade, not the end of it.
 ```xml
 <plugin id="com.example.myplugin" version="1.0.0">
     <platform name="ios">
+        <config-file parent="/*" target="config.xml">
+            <feature name="MyPlugin">
+                <param name="ios-package" value="MyPlugin"/>
+            </feature>
+        </config-file>
         <podspec>
             <pods>
                 <pod name="Alamofire" spec="~> 5.0"/>
@@ -61,9 +69,9 @@ import PackageDescription
 
 let package = Package(
     name: "com.example.myplugin",
-    platforms: [.iOS(.v14)],
+    platforms: [.iOS(.v15)],
     products: [
-        .library(name: "com.example.myplugin", targets: ["com.example.myplugin"])
+        .library(name: "com.example.myplugin", targets: ["MyPlugin"])
     ],
     dependencies: [
         .package(url: "https://github.com/apache/cordova-ios.git", branch: "master"),
@@ -71,7 +79,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "com.example.myplugin",
+            name: "MyPlugin",
             dependencies: [
                 .product(name: "Cordova", package: "cordova-ios"),
                 .product(name: "Alamofire", package: "Alamofire")
@@ -85,7 +93,13 @@ The tool also:
 
 - Adds `package="swift"` to the iOS platform in `plugin.xml`
 - Adds `nospm="true"` to `<pod>` elements to preserve CocoaPods compatibility
-- Injects `#if canImport(Cordova)` guards into Swift source files
+- Injects `#if canImport(Cordova)` guards into the Swift files of the plugin's declared iOS
+  source directories
+- Adds `import Foundation` to Swift files that need it — a Swift package has no bridging header
+  to provide it implicitly, unlike a CocoaPods build
+- Names the target after the plugin's iOS class, keeping the plugin id as the product name
+- Raises the minimum iOS version when the plugin or a dependency requires more than the MABS 13
+  floor of iOS 15
 - Updates `.gitignore` with SPM build artifacts
 
 ## Installation
@@ -107,6 +121,9 @@ mabs13-plugin-update
 # Update, resolving CocoaPods dependencies to SPM automatically
 mabs13-plugin-update --auto-resolve
 
+# Update, then check the generated package actually builds for iOS
+mabs13-plugin-update --auto-resolve --verify
+
 # Preview changes without writing files
 mabs13-plugin-update --dry-run --verbose
 
@@ -119,6 +136,8 @@ mabs13-plugin-update path/to/plugin.xml
 | Flag | Description |
 | --- | --- |
 | `--auto-resolve` | Automatically convert CocoaPods dependencies to SPM equivalents |
+| `--min-ios <version>` | Minimum iOS version for the generated `Package.swift` (defaults to `15.0`) |
+| `--verify` | Load the generated manifest and build the package for iOS (needs Xcode) |
 | `--dry-run` | Preview changes without modifying files |
 | `--force` | Skip all confirmation prompts |
 | `--verbose` | Enable detailed logging output |
@@ -133,8 +152,30 @@ When `--auto-resolve` is used, the tool looks up each CocoaPods dependency and:
 2. Finds the Git source URL and version tag
 3. Checks if the repository contains a `Package.swift`
 4. Converts the CocoaPods version spec to the SPM equivalent
+5. Reads the dependency's own minimum iOS version, from its `Package.swift` and its podspec, and
+   raises the generated manifest's platform to match
 
 If a dependency cannot be resolved automatically, it is added as a `// TODO:` comment in `Package.swift` for manual conversion.
+
+## How the minimum iOS version is chosen
+
+The generated `platforms:` entry is the highest of:
+
+- iOS 15, the lowest a Swift package can declare. Xcode 27, the toolchain MABS 13 builds with,
+  rejects anything below it during validation. (Xcode 26 applies the same rule to applications but
+  not to packages, which is why this did not affect MABS 12.)
+- a `deployment-target` or `IPHONEOS_DEPLOYMENT_TARGET` preference in the plugin's iOS platform
+- the minimum declared by each resolved dependency (with `--auto-resolve`)
+- `--min-ios`, when given
+
+Run with `--verbose` to see which of these set the version. A `--min-ios` lower than what is
+required is raised, with a warning.
+
+Nothing here lowers the result, including `--min-ios`. A dependency that requires more than a
+MABS 13 application's own deployment target (iOS 16) still sets the manifest's floor, and the tool
+warns instead of capping: capping would emit a manifest that cannot resolve, and the application's
+target can itself be raised from a Cordova hook. If you see that warning and no hook raises the
+target, the dependency version is the thing to change.
 
 ## Trademarks
 
