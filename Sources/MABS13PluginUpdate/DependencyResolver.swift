@@ -162,50 +162,70 @@ public class DependencyResolver {
         dependency: PodDependency
     ) async
         -> ResolvedDependency {
-        let reference = tag ?? branch ?? "main"
-        
-        // Step 4: Check if Package.swift exists in the repository
-        let hasPackageSwift = await gitChecker.hasPackageSwift(in: url, at: reference)
-        
-        if !hasPackageSwift {
+        // A version-looking tag (from a CocoaPods spec or a podspec's own declared tag) may not
+        // match the repo's actual Git tag convention (e.g. "17.0.0" vs. "v17.0.0"). Try both.
+        let candidates = Self.referenceCandidates(tag: tag, branch: branch)
+
+        for reference in candidates {
+            // Step 4: Check if Package.swift exists in the repository
+            guard await gitChecker.hasPackageSwift(in: url, at: reference) else { continue }
+
+            // Step 5: Fetch and parse Package.swift content
+            guard let packageContent = await gitChecker.fetchPackageSwiftContent(from: url, at: reference) else {
+                return ResolvedDependency(
+                    originalPod: dependency,
+                    spmDependency: nil,
+                    status: .packageSwiftNotAccessible
+                )
+            }
+
+            // Step 6: Parse Package.swift to extract library information
+            guard let packageInfo = spmParser.parsePackageSwift(packageContent),
+                  spmParser.isLibraryPackage(packageContent) else {
+                return ResolvedDependency(
+                    originalPod: dependency,
+                    spmDependency: nil,
+                    status: .notALibrary
+                )
+            }
+
+            // Step 7: Create SPM dependency, pinned to the reference that actually resolved
+            // (not the originally guessed tag, which may not exist on the remote).
             return ResolvedDependency(
                 originalPod: dependency,
-                spmDependency: nil,
-                status: .noPackageSwift
+                spmDependency: makeSPMDependency(
+                    url: url,
+                    tag: tag == nil ? nil : reference,
+                    packageInfo: packageInfo,
+                    podSpecInfo: podSpecInfo,
+                    dependency: dependency
+                ),
+                status: .resolved
             )
         }
-        
-        // Step 5: Fetch and parse Package.swift content
-        guard let packageContent = await gitChecker.fetchPackageSwiftContent(from: url, at: reference) else {
-            return ResolvedDependency(
-                originalPod: dependency,
-                spmDependency: nil,
-                status: .packageSwiftNotAccessible
-            )
-        }
-        
-        // Step 6: Parse Package.swift to extract library information
-        guard let packageInfo = spmParser.parsePackageSwift(packageContent),
-              spmParser.isLibraryPackage(packageContent) else {
-            return ResolvedDependency(
-                originalPod: dependency,
-                spmDependency: nil,
-                status: .notALibrary
-            )
-        }
-        
-        // Step 7: Create SPM dependency
+
         return ResolvedDependency(
             originalPod: dependency,
-            spmDependency: makeSPMDependency(
-                url: url,
-                tag: tag,
-                packageInfo: packageInfo,
-                podSpecInfo: podSpecInfo,
-                dependency: dependency
-            ),
-            status: .resolved
+            spmDependency: nil,
+            status: .noPackageSwift
         )
+    }
+
+    /// Builds the ordered list of Git refs to try for a dependency. A version-looking tag is
+    /// tried both with and without a leading "v", since CocoaPods version strings don't capture
+    /// which convention the target repo actually tags releases with (some use "17.0.0", others
+    /// "v17.0.0" — and a podspec's own declared tag can itself follow either one).
+    static func referenceCandidates(tag: String?, branch: String?) -> [String] {
+        guard let tag else { return [branch ?? "main"] }
+        let bareVersionPattern = #"^\d+(\.\d+)*$"#
+
+        if tag.range(of: bareVersionPattern, options: .regularExpression) != nil {
+            return [tag, "v\(tag)"]
+        }
+        if tag.hasPrefix("v"), tag.dropFirst().range(of: bareVersionPattern, options: .regularExpression) != nil {
+            return [tag, String(tag.dropFirst())]
+        }
+        return [tag]
     }
 }
 

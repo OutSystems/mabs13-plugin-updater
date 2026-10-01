@@ -137,4 +137,52 @@ final class DependencyResolverTests: XCTestCase {
         let tagReq = PodSpecResolver.convertSpecToSPMRequirement("~> 4.0", sourceTag: "v4.0.1")
         XCTAssertEqual(tagReq, .tag("v4.0.1"))
     }
+
+    // MARK: - referenceCandidates(tag:branch:)
+
+    /// CocoaPods version strings (e.g. "17.0.0") often don't match the repo's actual Git tag
+    /// (e.g. facebook-ios-sdk tags "v17.0.0"), so a bare version must also try a "v"-prefixed form.
+    func testReferenceCandidatesAddsVPrefixFallbackForBareVersion() {
+        XCTAssertEqual(
+            DependencyResolver.referenceCandidates(tag: "17.0.0", branch: nil),
+            ["17.0.0", "v17.0.0"]
+        )
+        XCTAssertEqual(
+            DependencyResolver.referenceCandidates(tag: "7.1", branch: nil),
+            ["7.1", "v7.1"]
+        )
+    }
+
+    /// Reverse case: the podspec's own declared tag already has a "v" prefix, but the repo's
+    /// actual Git tag doesn't (e.g. GoogleSignIn-style "7.1.0" tags) — the bare form must also
+    /// be tried, not just left as a single, possibly-wrong candidate.
+    func testReferenceCandidatesAddsBareFallbackForVPrefixedTag() {
+        XCTAssertEqual(
+            DependencyResolver.referenceCandidates(tag: "v17.0.0", branch: nil),
+            ["v17.0.0", "17.0.0"]
+        )
+        XCTAssertEqual(
+            DependencyResolver.referenceCandidates(tag: "v7.1", branch: nil),
+            ["v7.1", "7.1"]
+        )
+    }
+
+    func testReferenceCandidatesLeavesNonVersionTagUnchanged() {
+        // Branch-like or otherwise non-numeric refs aren't version guesses, so no fallback is added.
+        XCTAssertEqual(
+            DependencyResolver.referenceCandidates(tag: "release-branch", branch: nil),
+            ["release-branch"]
+        )
+    }
+
+    func testReferenceCandidatesFallsBackToBranchThenMainWhenNoTag() {
+        XCTAssertEqual(
+            DependencyResolver.referenceCandidates(tag: nil, branch: "develop"),
+            ["develop"]
+        )
+        XCTAssertEqual(
+            DependencyResolver.referenceCandidates(tag: nil, branch: nil),
+            ["main"]
+        )
+    }
 }
