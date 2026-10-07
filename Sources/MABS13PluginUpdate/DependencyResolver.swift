@@ -163,8 +163,11 @@ public class DependencyResolver {
     ) async
         -> ResolvedDependency {
         // A version-looking tag (from a CocoaPods spec or a podspec's own declared tag) may not
-        // match the repo's actual Git tag convention (e.g. "17.0.0" vs. "v17.0.0"). Try both.
+        // match the repo's actual Git tag convention (e.g. "17.0.0" vs. "v17.0.0"). Try both,
+        // and don't let an early candidate's failure (even past the existence check) hide a
+        // later candidate that would have actually resolved.
         let candidates = Self.referenceCandidates(tag: tag, branch: branch)
+        var lastFailureStatus: ResolutionStatus = .noPackageSwift
 
         for reference in candidates {
             // Step 4: Check if Package.swift exists in the repository
@@ -172,21 +175,15 @@ public class DependencyResolver {
 
             // Step 5: Fetch and parse Package.swift content
             guard let packageContent = await gitChecker.fetchPackageSwiftContent(from: url, at: reference) else {
-                return ResolvedDependency(
-                    originalPod: dependency,
-                    spmDependency: nil,
-                    status: .packageSwiftNotAccessible
-                )
+                lastFailureStatus = .packageSwiftNotAccessible
+                continue
             }
 
             // Step 6: Parse Package.swift to extract library information
             guard let packageInfo = spmParser.parsePackageSwift(packageContent),
                   spmParser.isLibraryPackage(packageContent) else {
-                return ResolvedDependency(
-                    originalPod: dependency,
-                    spmDependency: nil,
-                    status: .notALibrary
-                )
+                lastFailureStatus = .notALibrary
+                continue
             }
 
             // Step 7: Create SPM dependency, pinned to the reference that actually resolved
@@ -207,7 +204,7 @@ public class DependencyResolver {
         return ResolvedDependency(
             originalPod: dependency,
             spmDependency: nil,
-            status: .noPackageSwift
+            status: lastFailureStatus
         )
     }
 
